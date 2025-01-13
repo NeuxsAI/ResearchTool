@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileText, Plus, Grid2x2 } from "lucide-react";
+import { AddPaperDialog } from "@/components/library/add-paper-dialog";
 
 export default function LibraryPage() {
   const [papers, setPapers] = useState([
@@ -48,10 +49,7 @@ export default function LibraryPage() {
             Browse and manage your research papers and ideas
           </p>
         </div>
-        <Button size="sm" className="h-8">
-          <Plus className="mr-1.5 h-3.5 w-3.5" />
-          Add Paper
-        </Button>
+        <AddPaperDialog />
       </div>
 
       <Tabs defaultValue="items" className="w-full">

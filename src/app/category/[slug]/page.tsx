@@ -8,6 +8,7 @@ import { Plus, Trash2, MessageSquare, Pencil, LayoutGrid, List } from "lucide-re
 import { mockCategories } from "@/lib/store/mock-data";
 import type { Category } from "@/lib/store/mock-data";
 import { MainLayout } from "@/components/layout/main-layout";
+import { AddPaperDialog } from "@/components/library/add-paper-dialog";
 
 interface CategoryPageProps {
   params: Promise<{ slug: string }>;
@@ -33,18 +34,12 @@ export default function CategoryPage({ params }: CategoryPageProps) {
   const content = (
     <div className="h-full bg-[#1c1c1c]">
       <div className="p-6 border-b border-[#2a2a2a]">
-        <div className="max-w-3xl">
+        <div className="w-full">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-xl font-semibold text-[#eee]">{category.name}</h1>
-            <Button 
-              size="sm" 
-              className="h-7 px-3 text-[11px] bg-[#2a2a2a] border-[#333] text-[#888] hover:bg-[#333] hover:text-[#888]"
-            >
-              <Plus className="mr-2 h-3 w-3" />
-              Add Paper
-            </Button>
+            <AddPaperDialog />
           </div>
-          <p className="text-[11px] leading-relaxed text-[#888]">
+          <p className="max-w-3xl text-[11px] leading-relaxed text-[#888]">
             {category.description}
           </p>
         </div>

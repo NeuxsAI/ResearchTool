@@ -35,7 +35,6 @@ export default function DiscoverPage() {
         <div className="max-w-3xl">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-xl font-semibold text-[#eee]">Discover</h1>
-            <AddPaperDialog />
           </div>
           <p className="text-[11px] leading-relaxed text-[#888]">
             Discover trending and recommended papers based on your interests.

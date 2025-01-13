@@ -30,12 +30,12 @@ export default function RecentPage() {
   const content = (
     <div className="h-full bg-[#1c1c1c]">
       <div className="p-6 border-b border-[#2a2a2a]">
-        <div className="max-w-3xl">
+        <div className="w-full">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-xl font-semibold text-[#eee]">Recent</h1>
             <AddPaperDialog />
           </div>
-          <p className="text-[11px] leading-relaxed text-[#888]">
+          <p className="max-w-3xl text-[11px] leading-relaxed text-[#888]">
             Recently viewed and modified papers.
           </p>
         </div>
