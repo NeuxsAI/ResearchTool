@@ -16,6 +16,7 @@ import { deleteCategory } from "@/lib/supabase/db";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useCategories } from "@/lib/context/categories-context";
+import { createClient } from "@/lib/supabase/client";
 
 interface DeleteCategoryDialogProps {
   categoryId: string;
@@ -23,21 +24,25 @@ interface DeleteCategoryDialogProps {
 }
 
 export function DeleteCategoryDialog({ categoryId, categoryName }: DeleteCategoryDialogProps) {
-  const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
   const router = useRouter();
   const { refreshCategories } = useCategories();
+  const supabase = createClient();
 
   const handleDelete = async () => {
     try {
       setIsLoading(true);
-      const { error } = await deleteCategory(categoryId);
-      if (error) throw error;
       
-      await refreshCategories();
+      // Get the session token
+      const { data: { session } } = await supabase.auth.getSession();
+      const { error } = await deleteCategory(categoryId, session?.access_token);
+      
+      if (error) throw error;
       toast.success("Category deleted successfully");
-      setOpen(false);
-      router.push('/');
+      setIsOpen(false);
+      refreshCategories();
+      router.push("/");
     } catch (error) {
       console.error("Error deleting category:", error);
       toast.error("Failed to delete category");
@@ -47,39 +52,41 @@ export function DeleteCategoryDialog({ categoryId, categoryName }: DeleteCategor
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button 
-          variant="ghost" 
+        <Button
+          variant="ghost"
           size="icon"
-          className="h-6 w-6 text-red-400 opacity-0 group-hover:opacity-100 hover:text-red-400 hover:bg-[#333] transition-opacity"
+          className="h-5 w-5 hover:bg-[#2a2a2a]"
+          disabled={isLoading}
         >
-          <Trash className="h-3 w-3" />
+          <Trash className="h-3.5 w-3.5 text-[#888]" />
+          <span className="sr-only">Delete category</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px] bg-[#1c1c1c] border-[#2a2a2a]">
+      <DialogContent className="bg-[#1c1c1c] border-[#2a2a2a] text-white">
         <DialogHeader>
-          <DialogTitle className="text-white">Delete Category</DialogTitle>
+          <DialogTitle>Delete Category</DialogTitle>
           <DialogDescription className="text-[#888]">
-            Are you sure you want to delete "{categoryName}"? This action cannot be undone.
+            Are you sure you want to delete the category "{categoryName}"? This action cannot be undone.
           </DialogDescription>
         </DialogHeader>
-        <DialogFooter className="gap-2 sm:gap-0">
+        <DialogFooter>
           <Button
-            type="button"
             variant="ghost"
-            onClick={() => setOpen(false)}
-            className="h-7 px-3 text-[11px] text-[#888] hover:text-[#888] hover:bg-[#2a2a2a]"
+            onClick={() => setIsOpen(false)}
+            className="hover:bg-[#2a2a2a]"
+            disabled={isLoading}
           >
             Cancel
           </Button>
-          <Button 
-            type="button"
-            disabled={isLoading}
+          <Button
+            variant="destructive"
             onClick={handleDelete}
-            className="h-7 px-3 text-[11px] bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-400"
+            disabled={isLoading}
+            className="bg-red-500 hover:bg-red-600"
           >
-            Delete Category
+            {isLoading ? "Deleting..." : "Delete"}
           </Button>
         </DialogFooter>
       </DialogContent>

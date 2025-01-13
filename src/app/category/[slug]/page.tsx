@@ -37,6 +37,7 @@ export default function CategoryPage() {
   const [papers, setPapers] = useState<Paper[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isAddPaperOpen, setIsAddPaperOpen] = useState(false);
 
   useEffect(() => {
     async function loadData() {
@@ -105,7 +106,18 @@ export default function CategoryPage() {
         <div className="w-full">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-xl font-semibold text-[#eee]">{category.name}</h1>
-            {!isEmpty && <AddPaperDialog />}
+            {!isEmpty && (
+              <>
+                <Button 
+                  onClick={() => setIsAddPaperOpen(true)}
+                  className="h-7 px-3 text-[11px] bg-[#2a2a2a] hover:bg-[#333] text-white"
+                >
+                  <Plus className="h-3 w-3 mr-2" />
+                  Add paper
+                </Button>
+                <AddPaperDialog open={isAddPaperOpen} onOpenChange={setIsAddPaperOpen} categoryId={category.id} />
+              </>
+            )}
           </div>
           <p className="max-w-3xl text-[11px] leading-relaxed text-[#888]">
             {category.description}
@@ -124,7 +136,14 @@ export default function CategoryPage() {
               This category is empty. Start by importing an item.
             </p>
             <div className="flex flex-col w-full gap-2">
-              <AddPaperDialog />
+              <Button 
+                onClick={() => setIsAddPaperOpen(true)}
+                className="h-7 px-3 text-[11px] bg-[#2a2a2a] hover:bg-[#333] text-white"
+              >
+                <Plus className="h-3 w-3 mr-2" />
+                Add paper
+              </Button>
+              <AddPaperDialog open={isAddPaperOpen} onOpenChange={setIsAddPaperOpen} categoryId={category.id} />
             </div>
           </div>
         </div>

@@ -8,6 +8,7 @@ import { FileText, Plus, Grid2x2 } from "lucide-react";
 import { AddPaperDialog } from "@/components/library/add-paper-dialog";
 
 export default function LibraryPage() {
+  const [isAddPaperOpen, setIsAddPaperOpen] = useState(false);
   const [papers, setPapers] = useState([
     {
       id: "1",
@@ -49,7 +50,16 @@ export default function LibraryPage() {
             Browse and manage your research papers and ideas
           </p>
         </div>
-        <AddPaperDialog />
+        <Button
+          onClick={() => setIsAddPaperOpen(true)}
+          variant="ghost"
+          size="sm"
+          className="h-7 px-2"
+        >
+          <Plus className="h-3 w-3 mr-1" />
+          Add Paper
+        </Button>
+        <AddPaperDialog open={isAddPaperOpen} onOpenChange={setIsAddPaperOpen} />
       </div>
 
       <Tabs defaultValue="items" className="w-full">

@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import { getCategories } from "@/lib/supabase/db";
 import type { Category } from "@/lib/supabase/types";
+import { createClient } from "@/lib/supabase/client";
 
 interface CategoriesContextType {
   categories: Category[];
@@ -17,6 +18,7 @@ export function CategoriesProvider({ children }: { children: React.ReactNode }) 
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const supabase = createClient();
 
   async function refreshCategories() {
     try {
@@ -44,10 +46,6 @@ export function CategoriesProvider({ children }: { children: React.ReactNode }) 
   );
 }
 
-export function useCategories() {
-  const context = useContext(CategoriesContext);
-  if (context === undefined) {
-    throw new Error("useCategories must be used within a CategoriesProvider");
-  }
-  return context;
-} 
+export const useCategories = () => {
+  return useContext(CategoriesContext);
+}; 
