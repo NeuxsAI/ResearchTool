@@ -1,5 +1,5 @@
 export const routes = {
-  home: "/",
+  home: "/main",
   recent: "/recent",
   readingList: "/reading-list",
   discover: "/discover",

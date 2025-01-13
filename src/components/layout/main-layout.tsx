@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -19,8 +19,11 @@ import {
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { routes } from "@/app/routes";
-import { mockSidebarCategories } from "@/lib/store/mock-data";
 import { NewCategoryDialog } from "@/components/library/new-category-dialog";
+import { ProfileMenu } from "@/components/auth/profile-menu";
+import { useUser } from "@/lib/context/user-context";
+import { useCategories } from "@/lib/context/categories-context";
+import { DeleteCategoryDialog } from "@/components/library/delete-category-dialog";
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -42,6 +45,8 @@ const gradients = [
 export function MainLayout({ children }: MainLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const { user, isLoading: isUserLoading } = useUser();
+  const { categories, isLoading: isLoadingCategories, refreshCategories } = useCategories();
 
   const handleNavigation = (path: string) => {
     router.push(path);
@@ -54,6 +59,7 @@ export function MainLayout({ children }: MainLayoutProps) {
         <div className="p-2 border-b border-[#2a2a2a]">
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-[11px] font-medium px-2 text-[#888]">My Library</h2>
+            {!isUserLoading && user && <ProfileMenu user={user} />}
           </div>
           <div className="relative">
             <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-[#666]" />
@@ -120,24 +126,23 @@ export function MainLayout({ children }: MainLayoutProps) {
               <div className="px-2 py-1">
                 <span className="text-[11px] font-medium text-[#666]">My library</span>
               </div>
-              {mockSidebarCategories.map((category, index) => (
-                <Button
-                  key={category.id}
-                  variant={pathname === routes.category.view(category.id) ? "secondary" : "ghost"}
-                  className={`
-                    w-full justify-between h-6 px-2 text-[11px] font-normal group
-                    ${pathname === routes.category.view(category.id) ? "bg-[#2a2a2a] text-white" : "text-[#888] hover:bg-[#2a2a2a] hover:text-[#888]"}
-                  `}
-                  onClick={() => handleNavigation(routes.category.view(category.id))}
-                >
-                  <div className="flex items-center">
-                    <div className={`w-1.5 h-1.5 rounded-full bg-gradient-to-br ${gradients[index % gradients.length]} mr-2`} />
-                    <span>{category.name}</span>
-                  </div>
-                  {category.count > 0 && (
-                    <span className="text-[#666]">{category.count}</span>
-                  )}
-                </Button>
+              {categories.map((category, index) => (
+                <div key={category.id} className="group flex items-center">
+                  <Button
+                    variant={pathname === routes.category.view(category.id) ? "secondary" : "ghost"}
+                    className={`
+                      flex-1 justify-start h-6 px-4 text-[11px] font-normal
+                      ${pathname === routes.category.view(category.id) ? "bg-[#2a2a2a] text-white" : "text-[#888] hover:bg-[#2a2a2a] hover:text-[#888]"}
+                    `}
+                    onClick={() => handleNavigation(routes.category.view(category.id))}
+                  >
+                    <div className="flex items-center">
+                      <div className={`w-1.5 h-1.5 rounded-full bg-gradient-to-br ${gradients[index % gradients.length]} mr-2`} />
+                      <span>{category.name}</span>
+                    </div>
+                  </Button>
+                  <DeleteCategoryDialog categoryId={category.id} categoryName={category.name} />
+                </div>
               ))}
             </div>
           </div>
@@ -145,13 +150,6 @@ export function MainLayout({ children }: MainLayoutProps) {
 
         <div className="p-1.5 border-t border-[#2a2a2a]">
           <NewCategoryDialog />
-          <Button 
-            variant="ghost" 
-            className="w-full justify-start h-6 px-2 text-[11px] font-normal text-[#666] hover:bg-[#2a2a2a] hover:text-[#666]"
-          >
-            <Trash className="mr-2 h-3 w-3" />
-            Trash
-          </Button>
         </div>
       </aside>
 
