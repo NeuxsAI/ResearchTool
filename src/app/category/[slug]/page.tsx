@@ -37,7 +37,7 @@ export default function CategoryPage({ params }: CategoryPageProps) {
         <div className="w-full">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-xl font-semibold text-[#eee]">{category.name}</h1>
-            <AddPaperDialog />
+            {!isEmpty && <AddPaperDialog />}
           </div>
           <p className="max-w-3xl text-[11px] leading-relaxed text-[#888]">
             {category.description}
@@ -56,13 +56,7 @@ export default function CategoryPage({ params }: CategoryPageProps) {
               This category is empty. Start by importing an item.
             </p>
             <div className="flex flex-col w-full gap-2">
-              <Button 
-                size="sm" 
-                className="w-full justify-center h-7 text-[11px] bg-[#2a2a2a] border-[#333] text-[#888] hover:bg-[#333] hover:text-[#888]"
-              >
-                <Plus className="mr-2 h-3 w-3" />
-                Import Paper
-              </Button>
+              <AddPaperDialog />
               <Button 
                 variant="ghost" 
                 className="w-full justify-center h-7 text-[11px] text-red-500 hover:text-red-500 hover:bg-red-500/10"

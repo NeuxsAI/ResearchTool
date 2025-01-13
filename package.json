@@ -18,6 +18,8 @@
     "@radix-ui/react-tabs": "^1.1.2",
     "@radix-ui/react-tooltip": "^1.1.6",
     "@react-pdf/renderer": "^4.1.6",
+    "@supabase/ssr": "^0.5.2",
+    "@supabase/supabase-js": "^2.47.12",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "langchain": "^0.3.11",
@@ -29,6 +31,7 @@
     "react-dom": "^19.0.0",
     "react-dropzone": "^14.3.5",
     "react-pdf": "^9.2.1",
+    "sonner": "^1.7.1",
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7"
   },
