@@ -27,7 +27,7 @@ export function DeleteCategoryDialog({ categoryId, categoryName }: DeleteCategor
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const router = useRouter();
-  const { refreshCategories } = useCategories();
+  const categoriesContext = useCategories();
   const supabase = createClient();
 
   const handleDelete = async () => {
@@ -36,12 +36,12 @@ export function DeleteCategoryDialog({ categoryId, categoryName }: DeleteCategor
       
       // Get the session token
       const { data: { session } } = await supabase.auth.getSession();
-      const { error } = await deleteCategory(categoryId, session?.access_token);
+      const { error } = await deleteCategory(categoryId);
       
       if (error) throw error;
       toast.success("Category deleted successfully");
       setIsOpen(false);
-      refreshCategories();
+      categoriesContext?.refreshCategories?.();
       router.push("/");
     } catch (error) {
       console.error("Error deleting category:", error);
@@ -57,17 +57,17 @@ export function DeleteCategoryDialog({ categoryId, categoryName }: DeleteCategor
         <Button
           variant="ghost"
           size="icon"
-          className="h-5 w-5 hover:bg-[#2a2a2a]"
+          className="h-5 w-5 ml-2 text-gray-700 hover:text-red-500"
           disabled={isLoading}
         >
-          <Trash className="h-3.5 w-3.5 text-[#888]" />
+          <Trash className="h-3.5 w-3.5" />
           <span className="sr-only">Delete category</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="bg-[#1c1c1c] border-[#2a2a2a] text-white">
+      <DialogContent className="bg-zinc-900 border-zinc-800 text-zinc-100">
         <DialogHeader>
           <DialogTitle>Delete Category</DialogTitle>
-          <DialogDescription className="text-[#888]">
+          <DialogDescription className="text-zinc-400">
             Are you sure you want to delete the category "{categoryName}"? This action cannot be undone.
           </DialogDescription>
         </DialogHeader>
@@ -75,7 +75,7 @@ export function DeleteCategoryDialog({ categoryId, categoryName }: DeleteCategor
           <Button
             variant="ghost"
             onClick={() => setIsOpen(false)}
-            className="hover:bg-[#2a2a2a]"
+            className="text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100"
             disabled={isLoading}
           >
             Cancel
@@ -84,7 +84,7 @@ export function DeleteCategoryDialog({ categoryId, categoryName }: DeleteCategor
             variant="destructive"
             onClick={handleDelete}
             disabled={isLoading}
-            className="bg-red-500 hover:bg-red-600"
+            className="bg-red-600 hover:bg-red-700 text-white"
           >
             {isLoading ? "Deleting..." : "Delete"}
           </Button>
@@ -92,4 +92,4 @@ export function DeleteCategoryDialog({ categoryId, categoryName }: DeleteCategor
       </DialogContent>
     </Dialog>
   );
-} 
+}

@@ -33,7 +33,7 @@ Format the response as JSON with the following structure:
 }
 
 Paper content:
-${text.slice(0, 4000)}`
+${text.slice(0, 8000)}`
         }
       ]
     });

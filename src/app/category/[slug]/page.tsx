@@ -174,7 +174,7 @@ export default function CategoryPage() {
               <TabsContent value="grid">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {papers.map((paper) => (
-                    <Card key={paper.id} className="p-3 bg-[#2a2a2a] border-[#333] hover:bg-[#333] transition-colors">
+                    <Card key={paper.id} className="p-3 w-60 bg-[#2a2a2a] border-[#333] hover:bg-[#333] transition-colors">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5 text-[11px] text-[#666] mb-1">
                           <span>{category.name}</span>
