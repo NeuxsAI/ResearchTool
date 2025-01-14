@@ -13,18 +13,18 @@ import { useParams } from "next/navigation";
 
 interface Category {
   id: string;
-  name: string;
-  description: string;
-  color: string;
+  name?: string;
+  description?: string;
+  color?: string;
 }
 
 interface Paper {
   id: string;
-  title: string;
-  authors: string[];
-  year: number;
-  category_id: string;
-  annotations_count: number;
+  title?: string;
+  authors?: string[];
+  year?: number;
+  category_id?: string;
+  annotations_count?: number;
 }
 
 interface RawPaper extends Omit<Paper, 'annotations_count'> {
@@ -182,7 +182,7 @@ export default function CategoryPage() {
                           <span>{paper.year}</span>
                         </div>
                         <h3 className="text-[11px] font-medium text-[#eee] mb-1 line-clamp-2">{paper.title}</h3>
-                        <p className="text-[11px] text-[#888] truncate mb-3">{paper.authors.join(", ")}</p>
+                        <p className="text-[11px] text-[#888] truncate mb-3">{paper.authors?.join(", ") || "No authors"}</p>
                         <div className="flex items-center justify-between pt-2 border-t border-[#333]">
                           <div className="flex items-center gap-1">
                             <Button variant="ghost" size="icon" className="h-6 w-6 text-[#666] hover:text-[#888] hover:bg-[#333]">
@@ -190,7 +190,7 @@ export default function CategoryPage() {
                             </Button>
                             <Button variant="ghost" size="icon" className="h-6 w-6 text-[#666] hover:text-[#888] hover:bg-[#333]">
                               <MessageSquare className="h-3 w-3" />
-                              {paper.annotations_count > 0 && (
+                              {(paper.annotations_count || 0) > 0 && (
                                 <span className="absolute top-0.5 right-0.5 text-[10px] text-[#888]">
                                   {paper.annotations_count}
                                 </span>
@@ -216,7 +216,7 @@ export default function CategoryPage() {
                             <span>{paper.year}</span>
                           </div>
                           <h3 className="text-[11px] font-medium text-[#eee] mb-1 truncate">{paper.title}</h3>
-                          <p className="text-[11px] text-[#888] truncate">{paper.authors.join(", ")}</p>
+                          <p className="text-[11px] text-[#888] truncate">{paper.authors?.join(", ") || "No authors"}</p>
                         </div>
                         <div className="flex items-center gap-1">
                           <Button variant="ghost" size="icon" className="h-6 w-6 text-[#666] hover:text-[#888] hover:bg-[#333]">
@@ -224,7 +224,7 @@ export default function CategoryPage() {
                           </Button>
                           <Button variant="ghost" size="icon" className="h-6 w-6 text-[#666] hover:text-[#888] hover:bg-[#333]">
                             <MessageSquare className="h-3 w-3" />
-                            {paper.annotations_count > 0 && (
+                            {(paper.annotations_count || 0) > 0 && (
                               <span className="absolute top-0.5 right-0.5 text-[10px] text-[#888]">
                                 {paper.annotations_count}
                               </span>
