@@ -10,15 +10,14 @@ export interface Category {
 
 export interface Paper {
   id: string;
-  title: string;
-  authors: string[];
+  title?: string;
+  authors?: string[];
   year?: number;
-  abstract?: string;
-  url?: string;
   category_id?: string;
-  user_id: string;
-  created_at: string;
-  updated_at: string;
+  annotations_count?: number;
+  url?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface Annotation {
@@ -26,6 +25,11 @@ export interface Annotation {
   content: string;
   paper_id: string;
   user_id: string;
+  highlight_text?: string;
+  position?: {
+    x: number;
+    y: number;
+  };
   created_at: string;
   updated_at: string;
 }

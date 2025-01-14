@@ -7,9 +7,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Trash2, MessageSquare, Pencil, LayoutGrid, List } from "lucide-react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { AddPaperDialog } from "@/components/library/add-paper-dialog";
-import { getCategoryById, getPapersByCategory } from "@/lib/supabase/db";
+import { getCategoryById, getPapersByCategory, updatePaper } from "@/lib/supabase/db";
 import { toast } from "sonner";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
+import { EditPaperDialog } from "@/components/library/edit-paper-dialog";
 
 interface Category {
   id: string;
@@ -33,11 +34,14 @@ interface RawPaper extends Omit<Paper, 'annotations_count'> {
 
 export default function CategoryPage() {
   const params = useParams();
+  const router = useRouter();
   const [category, setCategory] = useState<Category | null>(null);
   const [papers, setPapers] = useState<Paper[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isAddPaperOpen, setIsAddPaperOpen] = useState(false);
+  const [selectedPaper, setSelectedPaper] = useState<Paper | null>(null);
+  const [isEditPaperOpen, setIsEditPaperOpen] = useState(false);
 
   useEffect(() => {
     async function loadData() {
@@ -78,6 +82,30 @@ export default function CategoryPage() {
     }
     loadData();
   }, [params?.slug]);
+
+  const handlePaperClick = (paper: Paper) => {
+    router.push(`/paper/${paper.id}`);
+  };
+
+  const handleEditClick = (e: React.MouseEvent, paper: Paper) => {
+    e.stopPropagation(); // Prevent card click
+    setSelectedPaper(paper);
+    setIsEditPaperOpen(true);
+  };
+
+  const handleUpdatePaper = async (paperDetails: { title: string; authors: string[]; year: number }) => {
+    if (!selectedPaper) return;
+    
+    const { error } = await updatePaper(selectedPaper.id, paperDetails);
+    if (error) throw error;
+
+    // Update papers list
+    setPapers(papers.map(p => 
+      p.id === selectedPaper.id 
+        ? { ...p, ...paperDetails }
+        : p
+    ));
+  };
 
   if (isLoading) {
     return <MainLayout>
@@ -174,7 +202,11 @@ export default function CategoryPage() {
               <TabsContent value="grid">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {papers.map((paper) => (
-                    <Card key={paper.id} className="p-3 w-60 bg-[#2a2a2a] border-[#333] hover:bg-[#333] transition-colors">
+                    <Card 
+                      key={paper.id} 
+                      className="p-3 w-60 bg-[#2a2a2a] border-[#333] hover:bg-[#333] transition-colors cursor-pointer"
+                      onClick={() => handlePaperClick(paper)}
+                    >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5 text-[11px] text-[#666] mb-1">
                           <span>{category.name}</span>
@@ -185,7 +217,12 @@ export default function CategoryPage() {
                         <p className="text-[11px] text-[#888] truncate mb-3">{paper.authors?.join(", ") || "No authors"}</p>
                         <div className="flex items-center justify-between pt-2 border-t border-[#333]">
                           <div className="flex items-center gap-1">
-                            <Button variant="ghost" size="icon" className="h-6 w-6 text-[#666] hover:text-[#888] hover:bg-[#333]">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-6 w-6 text-[#666] hover:text-[#888] hover:bg-[#333]"
+                              onClick={(e) => handleEditClick(e, paper)}
+                            >
                               <Pencil className="h-3 w-3" />
                             </Button>
                             <Button variant="ghost" size="icon" className="h-6 w-6 text-[#666] hover:text-[#888] hover:bg-[#333]">

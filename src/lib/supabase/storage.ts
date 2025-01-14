@@ -1,28 +1,34 @@
-import { createClient } from './server'
+import { createClient } from './client';
 
-export async function uploadPDF(file: File, userId: string, token: string) {
-  const supabase = createClient(token)
+const PAPERS_BUCKET = 'papers';
+
+export async function uploadPDF(file: File, paperId: string) {
+  const supabase = createClient();
   
-  // Create a unique file name
-  const fileExt = file.name.split('.').pop();
-  const fileName = `${userId}/${Math.random().toString(36).slice(2)}.${fileExt}`;
-
   const { data, error } = await supabase.storage
-    .from('papers')
-    .upload(fileName, file, {
-      cacheControl: '3600',
-      upsert: false
-    });
+    .from(PAPERS_BUCKET)
+    .upload(`${paperId}/paper.pdf`, file);
 
-  if (error) {
-    console.error('Storage upload error:', error);
-    throw error;
-  }
+  if (error) throw error;
+  return data;
+}
 
-  // Get the public URL
-  const { data: { publicUrl } } = supabase.storage
-    .from('papers')
-    .getPublicUrl(fileName);
+export async function getPDFUrl(paperId: string) {
+  const supabase = createClient();
+  
+  const { data } = await supabase.storage
+    .from(PAPERS_BUCKET)
+    .createSignedUrl(`${paperId}/paper.pdf`, 3600); // 1 hour expiry
 
-  return publicUrl;
+  return data?.signedUrl;
+}
+
+export async function deletePDF(paperId: string) {
+  const supabase = createClient();
+  
+  const { error } = await supabase.storage
+    .from(PAPERS_BUCKET)
+    .remove([`${paperId}/paper.pdf`]);
+
+  if (error) throw error;
 } 

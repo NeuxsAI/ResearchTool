@@ -75,9 +75,17 @@ export async function createPaper(paper: Partial<Paper>, token?: string): Promis
   return await supabase.from('papers').insert(paper).select().single()
 }
 
-export async function updatePaper(id: string, paper: Partial<Paper>, token?: string): Promise<DbResult<Paper>> {
-  const supabase = createServerClient(token)
-  return await supabase.from('papers').update(paper).eq('id', id).select().single()
+export async function updatePaper(
+  id: string, 
+  paper: Partial<Paper> | { title: string; authors: string[]; year: number }, 
+  token?: string
+): Promise<DbResult<Paper>> {
+  const supabase = token ? createServerClient(token) : createBrowserClient();
+  const updateData = {
+    ...paper,
+    updated_at: new Date().toISOString(),
+  };
+  return await supabase.from('papers').update(updateData).eq('id', id).select().single();
 }
 
 export async function deletePaper(id: string, token?: string): Promise<DbResult<Paper>> {
