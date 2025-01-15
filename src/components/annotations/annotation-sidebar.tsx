@@ -95,20 +95,26 @@ export function AnnotationSidebar({
             <p className="text-sm text-[#888]">{highlightedText}</p>
           </div>
         )}
-        <div className="flex gap-2">
+        <div className="relative bg-[#2a2a2a] rounded-lg border border-[#333] shadow-sm">
           <Textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            placeholder="Your comment"
-            className="flex-1 min-h-[40px] max-h-[200px] bg-[#2a2a2a] border-[#333] text-white resize-none"
+            placeholder="Add your thoughts..."
+            className="w-full min-h-[100px] bg-transparent border-none text-sm text-white/90 resize-none placeholder:text-[#666] focus:ring-0 p-3"
           />
-          <Button 
-            onClick={handleSave}
-            disabled={!content.trim() || isLoading}
-            className="h-10 px-4 bg-[#2a2a2a] hover:bg-[#333] text-white"
-          >
-            {isLoading ? "..." : "Save"}
-          </Button>
+          <div className="absolute bottom-2.5 right-2.5">
+            <Button 
+              onClick={handleSave}
+              disabled={!content.trim() || isLoading}
+              className="h-7 px-3 bg-[#1c1c1c] hover:bg-[#2a2a2a] text-[#888] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs font-medium transition-colors"
+            >
+              {isLoading ? (
+                <span className="inline-block w-3 h-3 border-2 border-[#444] border-t-[#888] rounded-full animate-spin" />
+              ) : (
+                "Submit"
+              )}
+            </Button>
+          </div>
         </div>
       </div>
     </div>

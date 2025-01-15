@@ -100,8 +100,22 @@ export async function getAnnotationsByPaper(paperId: string): Promise<DbArrayRes
 }
 
 export async function createAnnotation(annotation: Partial<Annotation>): Promise<DbResult<Annotation>> {
-  const supabase = createBrowserClient()
-  return await supabase.from('annotations').insert(annotation).select().single()
+  const supabase = createBrowserClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('User not authenticated');
+  
+  console.log("Creating annotation with:", {
+    ...annotation,
+    user_id: user.id
+  });
+  
+  const result = await supabase.from('annotations').insert({
+    ...annotation,
+    user_id: user.id
+  }).select().single();
+  
+  console.log("Supabase response:", result);
+  return result;
 }
 
 export async function updateAnnotation(id: string, annotation: Partial<Annotation>): Promise<DbResult<Annotation>> {

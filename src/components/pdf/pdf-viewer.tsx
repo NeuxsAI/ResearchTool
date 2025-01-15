@@ -32,9 +32,13 @@ const textLayerStyles = `
 interface PDFViewerProps {
   url: string;
   onSelection?: (text: string) => void;
+  annotations?: Array<{
+    id: string;
+    highlight_text?: string;
+  }>;
 }
 
-export function PDFViewer({ url, onSelection }: PDFViewerProps) {
+export function PDFViewer({ url, onSelection, annotations = [] }: PDFViewerProps) {
   const [numPages, setNumPages] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const pdfRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null);

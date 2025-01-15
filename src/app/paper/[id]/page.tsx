@@ -37,6 +37,7 @@ export default function PaperPage() {
   const [annotations, setAnnotations] = useState<Array<{
     id: string;
     content: string;
+    highlight_text?: string;
     created_at: string;
   }>>([]);
   const [highlightedText, setHighlightedText] = useState<string | undefined>();
@@ -93,26 +94,57 @@ export default function PaperPage() {
   const handleSaveAnnotation = async (content: string, highlightText?: string) => {
     if (!paper?.id) return;
 
-    const { error } = await createAnnotation({
-      content,
-      paper_id: paper.id,
-      highlight_text: highlightText
-    });
+    try {
+      const now = new Date().toISOString();
+      const { data, error } = await createAnnotation({
+        content,
+        paper_id: paper.id,
+        highlight_text: highlightText,
+        created_at: now,
+        updated_at: now
+      });
 
-    if (error) throw error;
+      if (error) {
+        console.error("Full annotation error:", error);
+        throw error;
+      }
 
-    // Reset selection
-    setHighlightedText(undefined);
+      // Reset selection
+      setHighlightedText(undefined);
 
-    // Reload annotations
-    const { data } = await getAnnotationsByPaper(paper.id);
-    setAnnotations(data || []);
-    toast.success("Annotation saved");
+      // Reload annotations
+      const { data: newAnnotations } = await getAnnotationsByPaper(paper.id);
+      setAnnotations(newAnnotations || []);
+      toast.success("Annotation saved");
+    } catch (error) {
+      console.error("Detailed error:", error);
+      toast.error("Failed to save annotation");
+    }
   };
 
   const handleTextSelection = (text: string) => {
     setHighlightedText(text);
     setIsAnnotationSidebarOpen(true);
+  };
+
+  const handleAnnotationClick = (annotationId: string) => {
+    // Find the annotation in the list
+    const annotation = annotations.find(a => a.id === annotationId);
+    if (!annotation) return;
+
+    // Open the sidebar
+    setIsAnnotationSidebarOpen(true);
+
+    // Scroll the annotation into view in the sidebar
+    setTimeout(() => {
+      const element = document.getElementById(`annotation-${annotationId}`);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Add a brief highlight effect
+        element.classList.add('highlight-pulse');
+        setTimeout(() => element.classList.remove('highlight-pulse'), 1000);
+      }
+    }, 100); // Small delay to ensure sidebar is open
   };
 
   if (isLoading) {
@@ -183,6 +215,7 @@ export default function PaperPage() {
             <PDFViewer 
               url={paper.url} 
               onSelection={handleTextSelection}
+              annotations={annotations}
             />
           ) : (
             <div className="h-full flex items-center justify-center text-[#888]">
@@ -211,6 +244,24 @@ export default function PaperPage() {
         annotations={annotations}
         highlightedText={highlightedText}
       />
+
+      <style jsx global>{`
+        .highlight-pulse {
+          animation: pulse 1s;
+        }
+
+        @keyframes pulse {
+          0% {
+            background-color: rgba(255, 255, 0, 0);
+          }
+          50% {
+            background-color: rgba(255, 255, 0, 0.2);
+          }
+          100% {
+            background-color: rgba(255, 255, 0, 0);
+          }
+        }
+      `}</style>
     </MainLayout>
   );
 } 
