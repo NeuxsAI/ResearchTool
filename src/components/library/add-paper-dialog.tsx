@@ -65,59 +65,76 @@ export function AddPaperDialog({ open, onOpenChange, categoryId }: AddPaperDialo
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title || (activeTab === "upload" && !file) || (activeTab === "url" && !url)) {
-      toast.error("Please fill in all required fields");
-      return;
-    }
-
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    
     try {
       setIsLoading(true);
-      const formData = new FormData();
-      
-      // Add either file or URL
-      if (activeTab === "upload" && file) {
-        formData.append('file', file);
-      } else if (activeTab === "url" && url) {
-        formData.append('url', url);
+
+      // Get auth token
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error('Not authenticated');
       }
 
-      // Add metadata
-      formData.append('title', title);
-      formData.append('authors', JSON.stringify(authors.split(',').map(a => a.trim())));
-      formData.append('year', year);
-      formData.append('abstract', abstract);
+      // Parse authors string into array
+      const authorsList = authors.split(',').map(author => author.trim()).filter(Boolean);
       
-      // Always include categoryId if it exists
+      // Create form data
+      const formData = new FormData();
+      if (file) {
+        formData.append('file', file);
+      }
+      if (url) {
+        formData.append('url', url);
+      }
+      formData.append('title', title);
+      formData.append('authors', JSON.stringify(authorsList));
+      formData.append('year', year.toString());
+      if (abstract) {
+        formData.append('abstract', abstract);
+      }
       if (categoryId) {
         formData.append('categoryId', categoryId);
       }
 
-      // Get the session token
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      
+      // Log the data being sent
+      console.log('Form data being sent:', {
+        title,
+        authors: authorsList,
+        year,
+        abstract,
+        categoryId,
+        hasFile: !!file,
+        fileName: file?.name,
+        fileSize: file?.size,
+        url
+      });
+
+      // Submit the form
       const response = await fetch('/api/papers', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${session?.access_token}`
+          'Authorization': `Bearer ${session.access_token}`
         },
-        body: formData,
+        body: formData
       });
 
+      const data = await response.json();
+      console.log('Response from server:', data);
+      
       if (!response.ok) {
-        const data = await response.json();
+        console.error('Failed to create paper:', data);
         throw new Error(data.error || 'Failed to create paper');
       }
 
       toast.success("Paper added successfully");
       onOpenChange(false);
-      resetForm();
       router.refresh();
     } catch (error) {
-      console.error("Error adding paper:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to add paper");
+      console.error('Error adding paper:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to add paper');
     } finally {
       setIsLoading(false);
     }

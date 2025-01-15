@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { FileText, MessageSquare } from "lucide-react";
-import { getPaperById } from "@/lib/supabase/db";
+import { getPaperById, updatePaper } from "@/lib/supabase/db";
 import { MainLayout } from "@/components/layout/main-layout";
 import { EditPaperDialog } from "@/components/library/edit-paper-dialog";
 import { PDFViewer } from '@/components/pdf/pdf-viewer';
@@ -168,11 +168,17 @@ export default function PaperPage() {
 
   const handleUpdatePaper = async (paperDetails: { title: string; authors: string[]; year: number }) => {
     try {
+      console.log('Updating paper with details:', paperDetails);
       const { error } = await updatePaper(paper.id, paperDetails);
-      if (error) throw error;
+      if (error) {
+        console.error('Full update error:', error);
+        throw error;
+      }
       setPaper(prev => prev ? { ...prev, ...paperDetails } : null);
+      toast.success('Paper updated successfully');
     } catch (error) {
-      console.error("Error updating paper:", error);
+      console.error('Error updating paper:', error);
+      toast.error('Failed to update paper');
       throw error;
     }
   };

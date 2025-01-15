@@ -85,7 +85,11 @@ export async function updatePaper(
     ...paper,
     updated_at: new Date().toISOString(),
   };
-  return await supabase.from('papers').update(updateData).eq('id', id).select().single();
+  console.log('Updating paper with ID:', id);
+  console.log('Update data:', updateData);
+  const result = await supabase.from('papers').update(updateData).eq('id', id).select().single();
+  console.log('Update result:', result);
+  return result;
 }
 
 export async function deletePaper(id: string, token?: string): Promise<DbResult<Paper>> {

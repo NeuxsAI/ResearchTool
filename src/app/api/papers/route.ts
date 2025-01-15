@@ -10,6 +10,7 @@ export async function POST(request: Request) {
     // Get auth token from request header
     const authHeader = request.headers.get('Authorization');
     if (!authHeader?.startsWith('Bearer ')) {
+      console.error('Missing or invalid authorization header');
       return NextResponse.json(
         { error: 'Missing or invalid authorization header' },
         { status: 401 }
@@ -35,24 +36,37 @@ export async function POST(request: Request) {
     const file = formData.get('file') as File | null;
     const url = formData.get('url') as string | null;
     const title = formData.get('title') as string;
-    const authors = JSON.parse(formData.get('authors') as string) as string[];
-    const year = parseInt(formData.get('year') as string);
+    const authorsStr = formData.get('authors') as string;
+    const yearStr = formData.get('year') as string;
     const abstract = formData.get('abstract') as string;
     const categoryId = formData.get('categoryId') as string;
 
-    console.log('Form data received:', {
-      hasFile: !!file,
-      url,
-      title,
-      authors,
-      year,
-      hasAbstract: !!abstract,
-      categoryId
-    });
-
-    if (!title) {
+    // Parse and validate the data
+    if (!title?.trim()) {
       return NextResponse.json(
         { error: 'Title is required' },
+        { status: 400 }
+      );
+    }
+
+    let authors: string[];
+    try {
+      authors = JSON.parse(authorsStr);
+      if (!Array.isArray(authors)) {
+        throw new Error('Authors must be an array');
+      }
+    } catch (error) {
+      console.error('Error parsing authors:', error);
+      return NextResponse.json(
+        { error: 'Invalid authors format' },
+        { status: 400 }
+      );
+    }
+
+    const year = parseInt(yearStr);
+    if (isNaN(year)) {
+      return NextResponse.json(
+        { error: 'Invalid year format' },
         { status: 400 }
       );
     }
@@ -64,6 +78,18 @@ export async function POST(request: Request) {
       );
     }
 
+    console.log('Parsed form data:', {
+      title,
+      authors,
+      year,
+      abstract,
+      categoryId,
+      hasFile: !!file,
+      fileName: file?.name,
+      fileSize: file?.size,
+      url
+    });
+
     // Get the PDF URL - either from file upload or direct URL
     let pdfUrl: string;
     if (file) {
@@ -73,7 +99,10 @@ export async function POST(request: Request) {
         console.log('File uploaded successfully:', pdfUrl);
       } catch (uploadError) {
         console.error('Upload error:', uploadError);
-        throw new Error('Failed to upload PDF');
+        return NextResponse.json(
+          { error: 'Failed to upload PDF: ' + (uploadError instanceof Error ? uploadError.message : 'Unknown error') },
+          { status: 500 }
+        );
       }
     } else if (url) {
       // Validate URL
@@ -94,7 +123,15 @@ export async function POST(request: Request) {
       );
     }
 
-    console.log('Creating paper record with URL:', pdfUrl);
+    console.log('Creating paper record with data:', {
+      title,
+      authors,
+      year,
+      abstract,
+      category_id: categoryId,
+      user_id: user.id,
+      url: pdfUrl
+    });
 
     // Create paper record in database
     const { data: paper, error: dbError } = await createPaper({
@@ -109,7 +146,18 @@ export async function POST(request: Request) {
 
     if (dbError) {
       console.error('Database error:', dbError);
-      throw new Error('Failed to save paper to database');
+      return NextResponse.json(
+        { error: 'Failed to save paper to database: ' + dbError.message },
+        { status: 500 }
+      );
+    }
+
+    if (!paper) {
+      console.error('No paper data returned from database');
+      return NextResponse.json(
+        { error: 'Failed to create paper: No data returned' },
+        { status: 500 }
+      );
     }
 
     console.log('Paper created successfully:', paper);
