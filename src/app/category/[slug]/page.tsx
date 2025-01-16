@@ -204,7 +204,7 @@ export default function CategoryPage() {
                   {papers.map((paper) => (
                     <Card 
                       key={paper.id} 
-                      className="p-3 w-60 bg-[#2a2a2a] border-[#333] hover:bg-[#333] transition-colors cursor-pointer"
+                      className="p-3 bg-[#2a2a2a] border-[#333] hover:bg-[#333] transition-colors cursor-pointer"
                       onClick={() => handlePaperClick(paper)}
                     >
                       <div className="flex-1 min-w-0">
