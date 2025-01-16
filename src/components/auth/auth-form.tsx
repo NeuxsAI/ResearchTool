@@ -6,11 +6,16 @@ import { Input } from "@/components/ui/input"
 import { createClient } from "@/lib/supabase/client"
 import { Github, Loader2 } from "lucide-react"
 import { toast } from "sonner"
+import { useRouter } from 'next/navigation'
+
 
 export function AuthForm() {
   const [isLoading, setIsLoading] = useState(false)
+  const [password, setPassword] = useState("")
   const [email, setEmail] = useState("")
   const supabase = createClient()
+  const router = useRouter()
+
 
   async function signInWithGithub() {
     try {
@@ -32,27 +37,29 @@ export function AuthForm() {
   }
 
   async function signInWithEmail() {
-    if (!email) return
-
+    if (!email || !password) return
+       
     try {
       setIsLoading(true)
-      const { error } = await supabase.auth.signInWithOtp({
+      const { error } = await supabase.auth.signInWithPassword({
         email,
-        options: {
-          emailRedirectTo: `${location.origin}/auth/callback`,
-        },
+        password,
       })
+      
       if (error) throw error
-      toast.success("Check your email for the login link!")
-      setEmail("")
+      toast.success("Signed in successfully!")
+      router.push('/main')
+      router.refresh() // Force a refresh of the page data
     } catch (error) {
-      toast.error("Could not send login link")
+      toast.error("Failed to sign in")
       console.error("Error:", error)
     } finally {
       setIsLoading(false)
     }
   }
 
+  
+       
   return (
     <div className="flex flex-col gap-4 min-w-[300px]">
       <Button
@@ -85,18 +92,23 @@ export function AuthForm() {
           className="bg-[#1c1c1c] border-[#2a2a2a] text-white placeholder:text-[#666] h-11"
           disabled={isLoading}
         />
+        <Input
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          className="bg-[#1c1c1c] border-[#2a2a2a] text-white placeholder:text-[#666] h-11"
+          disabled={isLoading}
+        />
         <Button
           onClick={signInWithEmail}
-          disabled={isLoading || !email}
+          disabled={isLoading || !email || !password}
           className="bg-white text-black hover:bg-gray-100 relative h-11"
         >
           {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           Sign in with Email
         </Button>
       </div>
-      <p className="text-center text-sm text-[#666]">
-        You will receive a magic link to sign in
-      </p>
     </div>
   )
-} 
+}
