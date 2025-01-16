@@ -54,7 +54,7 @@ export async function middleware(request: NextRequest) {
 
   // If there's a session and the user is trying to access the login page
   if (session && request.nextUrl.pathname.startsWith('/login')) {
-    //console.log("test 2!")
+    console.log("test 2!")
     const redirectUrl = request.nextUrl.clone()
     redirectUrl.pathname = '/main'
     return NextResponse.redirect(redirectUrl)
