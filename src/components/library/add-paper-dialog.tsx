@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { LoadingOverlay } from "@/components/ui/loading-overlay";
+
 import {
   Dialog,
   DialogContent,
@@ -152,6 +154,7 @@ export function AddPaperDialog({ open, onOpenChange, categoryId }: AddPaperDialo
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px] bg-[#1c1c1c] border-[#2a2a2a]">
+        {isLoading && <LoadingOverlay message="Processing your paper..." />}
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle className="text-white">Add Paper</DialogTitle>

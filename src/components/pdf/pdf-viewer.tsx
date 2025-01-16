@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
+import { LoadingOverlay } from "@/components/ui/loading-overlay"
+
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
@@ -245,27 +247,24 @@ export function PDFViewer({ url, onSelection, annotations = [] }: PDFViewerProps
   };
 
   return (
-    <div className="flex flex-col items-center p-4 overflow-auto bg-[#1c1c1c] min-h-full">
-      {isLoading ? (
-        <div className="text-white">Loading PDF...</div>
-      ) : (
-        Array.from({ length: numPages }, (_, i) => i + 1).map((pageNum) => (
-          <div 
-            key={pageNum} 
-            className="relative mb-4 select-none" 
-            onMouseUp={handleTextSelection}
-          >
-            <canvas
-              id={`page-${pageNum}`}
-              className="bg-white shadow-lg"
-            />
-            <div
-              id={`text-layer-${pageNum}`}
-              className="absolute top-0 left-0 text-layer select-text"
-            />
-          </div>
-        ))
-      )}
-    </div>
-  );
+    <div className="relative flex flex-col items-center p-4 overflow-auto bg-[#1c1c1c] min-h-full">
+    {isLoading && <LoadingOverlay message="Processing PDF..." />}
+    {!isLoading && Array.from({ length: numPages }, (_, i) => i + 1).map((pageNum) => (
+      <div 
+        key={pageNum} 
+        className="relative mb-4 select-none" 
+        onMouseUp={handleTextSelection}
+      >
+        <canvas
+          id={`page-${pageNum}`}
+          className="bg-white shadow-lg"
+        />
+        <div
+          id={`text-layer-${pageNum}`}
+          className="absolute top-0 left-0 text-layer select-text"
+        />
+      </div>
+    ))}
+  </div>
+);
 } 
