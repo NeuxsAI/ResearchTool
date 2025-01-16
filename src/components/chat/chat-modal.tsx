@@ -5,16 +5,20 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Brain, Send, X, Minus, Square } from "lucide-react";
 import { Rnd } from "react-rnd";
+import { updateChatHistory, getChatHistory } from "@/lib/supabase/chat";
+import { toast } from "sonner";
 
 interface ChatModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   highlightedText?: string;
+  annotationId: string;
 }
 
 interface Message {
   role: "user" | "assistant";
   content: string;
+  timestamp: string;
 }
 
 const quickPrompts = [
@@ -25,7 +29,7 @@ const quickPrompts = [
   "Give me an example",
 ];
 
-export function ChatModal({ open, onOpenChange, highlightedText }: ChatModalProps) {
+export function ChatModal({ open, onOpenChange, highlightedText, annotationId }: ChatModalProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -33,21 +37,38 @@ export function ChatModal({ open, onOpenChange, highlightedText }: ChatModalProp
   const lastPosition = useRef({ x: 100, y: 100 });
   const lastSize = useRef({ width: 500, height: 600 });
 
+  // Load chat history when modal opens
   useEffect(() => {
-    if (!highlightedText && open) {
-      onOpenChange(false);
+    if (open && annotationId) {
+      loadChatHistory();
     }
-  }, [highlightedText, open, onOpenChange]);
+  }, [open, annotationId]);
+
+  const loadChatHistory = async () => {
+    try {
+      const history = await getChatHistory(annotationId);
+      setMessages(history);
+    } catch (error) {
+      console.error("Error loading chat history:", error);
+      toast.error("Failed to load chat history");
+    }
+  };
 
   const handleSend = async () => {
     if (!input.trim()) return;
 
-    const newMessage: Message = { role: "user", content: input };
+    const newMessage: Message = {
+      role: "user",
+      content: input,
+      timestamp: new Date().toISOString()
+    };
+
     setMessages([...messages, newMessage]);
     setInput("");
     setIsLoading(true);
 
     try {
+      // Send to OpenAI API
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: {
@@ -64,12 +85,29 @@ export function ChatModal({ open, onOpenChange, highlightedText }: ChatModalProp
       }
 
       const data = await response.json();
-      setMessages((prev) => [...prev, { role: "assistant", content: data.message }]);
+      
+      // Create assistant message
+      const assistantMessage: Message = {
+        role: "assistant",
+        content: data.message,
+        timestamp: new Date().toISOString()
+      };
+
+      // Store both messages in Supabase
+      await updateChatHistory(annotationId, newMessage);
+      await updateChatHistory(annotationId, assistantMessage);
+
+      setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
       console.error("Error in chat:", error);
-      setMessages((prev) => [
+      toast.error("Failed to send message");
+      setMessages(prev => [
         ...prev,
-        { role: "assistant", content: "Sorry, I encountered an error. Please try again." },
+        {
+          role: "assistant",
+          content: "Sorry, I encountered an error. Please try again.",
+          timestamp: new Date().toISOString()
+        }
       ]);
     } finally {
       setIsLoading(false);

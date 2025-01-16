@@ -13,6 +13,11 @@ interface AnnotationSidebarProps {
     content: string;
     highlight_text?: string;
     created_at: string;
+    chat_history?: Array<{
+      role: "user" | "assistant";
+      content: string;
+      timestamp: string;
+    }>;
   }>;
   highlightedText?: string;
 }
@@ -27,6 +32,7 @@ export function AnnotationSidebar({
   const [content, setContent] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null);
 
   const handleSave = async () => {
     if (!content.trim()) return;
@@ -39,6 +45,25 @@ export function AnnotationSidebar({
       console.error("Error saving annotation:", error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleOpenChat = async () => {
+    if (!highlightedText) return;
+
+    try {
+      // If there's no active annotation, create one first
+      if (!activeAnnotationId) {
+        await handleSave();
+        // Get the latest annotation (the one we just created)
+        const latestAnnotation = annotations[annotations.length - 1];
+        if (latestAnnotation) {
+          setActiveAnnotationId(latestAnnotation.id);
+        }
+      }
+      setIsChatOpen(true);
+    } catch (error) {
+      console.error("Error preparing chat:", error);
     }
   };
 
@@ -122,7 +147,7 @@ export function AnnotationSidebar({
                 )}
               </Button>
               <Button
-                onClick={() => setIsChatOpen(true)}
+                onClick={handleOpenChat}
                 disabled={!highlightedText}
                 className="h-5 px-2 bg-violet-900/50 hover:bg-violet-900/75 text-white text-[10px] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed rounded font-medium transition-colors"
               >
@@ -137,6 +162,7 @@ export function AnnotationSidebar({
         open={isChatOpen}
         onOpenChange={setIsChatOpen}
         highlightedText={highlightedText}
+        annotationId={activeAnnotationId!}
       />
     </>
   );
