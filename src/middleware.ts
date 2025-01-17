@@ -43,18 +43,20 @@ export async function middleware(request: NextRequest) {
 
   const { data: { session }, error } = await supabase.auth.getSession()
 
+  // Allow public access to the landing page (root path)
+  if (request.nextUrl.pathname === '/') {
+    return response
+  }
+
   // If there's no session and the user is not trying to access the login page
-  if (!session && !request.nextUrl.pathname.startsWith('/login')) {
-    console.log("test 1!")
+  if (!session && !request.nextUrl.pathname.startsWith('/main')) {
     const redirectUrl = request.nextUrl.clone()
-    console.log()
-    redirectUrl.pathname = '/main'
+    redirectUrl.pathname = '/login'
     return NextResponse.redirect(redirectUrl)
   }
 
   // If there's a session and the user is trying to access the login page
   if (session && request.nextUrl.pathname.startsWith('/login')) {
-    console.log("test 2!")
     const redirectUrl = request.nextUrl.clone()
     redirectUrl.pathname = '/main'
     return NextResponse.redirect(redirectUrl)
