@@ -39,7 +39,7 @@ export function EarlyAccess() {
   }
 
   return (
-    <section className="min-h-[50vh] flex items-center justify-center relative">
+    <section id="early-access" className="py-32 relative">
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}

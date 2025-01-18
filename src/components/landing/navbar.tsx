@@ -3,8 +3,28 @@
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { motion } from "framer-motion"
+import { createClient } from "@/lib/supabase/client"
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 
 export function Navbar() {
+  const [session, setSession] = useState<any>(null)
+  const supabase = createClient()
+  const router = useRouter()
+
+  useEffect(() => {
+    const getSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      setSession(session)
+    }
+    getSession()
+  }, [supabase])
+
+  const scrollToEarlyAccess = () => {
+    const element = document.getElementById('early-access')
+    element?.scrollIntoView({ behavior: 'smooth' })
+  }
+
   return (
     <motion.nav
       initial={{ y: -100, opacity: 0 }}
@@ -19,8 +39,10 @@ export function Navbar() {
           transition={{ duration: 0.5, delay: 0.2 }}
           className="flex items-center gap-2"
         >
-          <span className="text-lg font-medium text-white/90">nexus</span>
-          <span className="text-lg font-medium bg-gradient-to-r from-purple-500 via-blue-500 to-indigo-500 text-transparent bg-clip-text">mind</span>
+          <Link href="/" className="flex items-center gap-2">
+            <span className="text-lg font-medium text-white/90">nexus</span>
+            <span className="text-lg font-medium bg-gradient-to-r from-purple-500 via-blue-500 to-indigo-500 text-transparent bg-clip-text">mind</span>
+          </Link>
         </motion.div>
         <motion.div 
           initial={{ opacity: 0, x: 20 }}
@@ -28,18 +50,18 @@ export function Navbar() {
           transition={{ duration: 0.5, delay: 0.2 }}
           className="flex items-center gap-6"
         >
-          <Link 
-            href="/research" 
+          <button 
+            onClick={scrollToEarlyAccess}
             className="text-sm text-[#888] hover:text-white/90 transition-colors"
           >
-            Research
-          </Link>
+            Early Access
+          </button>
           <Button 
-            asChild 
+            onClick={() => router.push(session ? '/main' : '/login')}
             variant="default" 
             className="bg-white text-black hover:bg-white/90"
           >
-            <Link href="/login">Log In</Link>
+            {session ? 'Dashboard' : 'Log In'}
           </Button>
         </motion.div>
       </div>

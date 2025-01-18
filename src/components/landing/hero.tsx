@@ -2,7 +2,6 @@
 
 import { Button } from "@/components/ui/button"
 import { ArrowRight } from "lucide-react"
-import Link from "next/link"
 import { motion } from "framer-motion"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
@@ -23,6 +22,11 @@ export function Hero() {
 
   const handleGetStarted = () => {
     router.push(session ? '/main' : '/login')
+  }
+
+  const scrollToEarlyAccess = () => {
+    const element = document.getElementById('early-access')
+    element?.scrollIntoView({ behavior: 'smooth' })
   }
 
   return (
@@ -54,12 +58,12 @@ export function Hero() {
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
             <Button 
-              asChild 
+              onClick={scrollToEarlyAccess}
               size="lg" 
               variant="outline" 
               className="border-[#333] text-white hover:bg-[#ffffff10]"
             >
-              <Link href="#">Learn More</Link>
+              Learn More
             </Button>
           </div>
         </motion.div>
