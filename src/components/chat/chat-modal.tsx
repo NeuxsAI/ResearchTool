@@ -7,6 +7,7 @@ import { Brain, Send, X, Minus, Square } from "lucide-react";
 import { Rnd } from "react-rnd";
 import { updateChatHistory, getChatHistory } from "@/lib/supabase/chat";
 import { toast } from "sonner";
+import { createClient } from "@/lib/supabase/client";
 
 interface ChatModalProps {
   open: boolean;
@@ -32,10 +33,13 @@ const quickPrompts = [
 export function ChatModal({ open, onOpenChange, highlightedText, annotationId }: ChatModalProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
+  const [session, setSession] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
-  const lastPosition = useRef({ x: 100, y: 100 });
-  const lastSize = useRef({ width: 500, height: 600 });
+  const [position, setPosition] = useState({ 
+    x: typeof window !== 'undefined' ? (window.innerWidth - 500) / 2 : 0,
+    y: typeof window !== 'undefined' ? (window.innerHeight - 200) / 2 : 0 
+  });
 
   // Load chat history when modal opens
   useEffect(() => {
@@ -43,6 +47,24 @@ export function ChatModal({ open, onOpenChange, highlightedText, annotationId }:
       loadChatHistory();
     }
   }, [open, annotationId]);
+
+  useEffect(() => {
+    const getSession = async () => {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      setSession(session);
+    };
+    getSession();
+  }, []);
+
+  // Set initial position in center of screen
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const x = (window.innerWidth - 500) / 2;
+      const y = (window.innerHeight) / 2;
+      setPosition({ x, y });
+    }
+  }, []);
 
   const loadChatHistory = async () => {
     try {
@@ -56,6 +78,11 @@ export function ChatModal({ open, onOpenChange, highlightedText, annotationId }:
 
   const handleSend = async () => {
     if (!input.trim()) return;
+
+    if (!session?.access_token) {
+        toast.error("Not authenticated. Please try logging in again.");
+        return;
+      }
 
     const newMessage: Message = {
       role: "user",
@@ -72,13 +99,16 @@ export function ChatModal({ open, onOpenChange, highlightedText, annotationId }:
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
+           'Content-Type': 'application/json',
+           'Authorization': `Bearer ${session?.access_token}`
         },
         body: JSON.stringify({
           messages: [...messages, newMessage],
           highlightedText,
         }),
       });
+
+      console.log(response);
 
       if (!response.ok) {
         throw new Error("Failed to get response");
@@ -127,30 +157,21 @@ export function ChatModal({ open, onOpenChange, highlightedText, annotationId }:
   return (
     <Rnd
       default={{
-        x: 100,
-        y: 100,
+        x: position.x,
+        y: position.y,
         width: 500,
         height: 600,
       }}
       minWidth={400}
       minHeight={400}
+      maxWidth={800}
+      maxHeight={800}
       bounds="window"
       dragHandleClassName="chat-window-header"
       position={isMaximized ? { x: 0, y: 0 } : undefined}
       size={isMaximized ? { width: window.innerWidth, height: window.innerHeight } : undefined}
       onDragStop={(e, d) => {
-        if (!isMaximized) {
-          lastPosition.current = { x: d.x, y: d.y };
-        }
-      }}
-      onResizeStop={(e, direction, ref, delta, position) => {
-        if (!isMaximized) {
-          lastSize.current = {
-            width: parseInt(ref.style.width),
-            height: parseInt(ref.style.height),
-          };
-          lastPosition.current = position;
-        }
+        setPosition({ x: d.x, y: d.y });
       }}
       disableDragging={isMaximized}
       className="fixed z-50 bg-[#1c1c1c] rounded-lg border border-[#2a2a2a] shadow-lg overflow-hidden"

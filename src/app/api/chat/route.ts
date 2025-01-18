@@ -8,15 +8,28 @@ const openai = new OpenAI({
 
 export async function POST(request: Request) {
   try {
-    const supabase = createClient();
-    const { data: { session } } = await supabase.auth.getSession();
-
-    if (!session) {
+    const authHeader = request.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
       );
     }
+
+    // Get the token and create client
+    const token = authHeader.split(' ')[1];
+    const supabase = createClient(token);
+    
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
+    console.log(user)
 
     const { messages, highlightedText } = await request.json();
 
