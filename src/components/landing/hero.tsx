@@ -4,8 +4,27 @@ import { Button } from "@/components/ui/button"
 import { ArrowRight } from "lucide-react"
 import Link from "next/link"
 import { motion } from "framer-motion"
+import { useRouter } from "next/navigation"
+import { createClient } from "@/lib/supabase/client"
+import { useEffect, useState } from "react"
 
 export function Hero() {
+  const [session, setSession] = useState<any>(null)
+  const router = useRouter()
+  const supabase = createClient()
+
+  useEffect(() => {
+    const getSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      setSession(session)
+    }
+    getSession()
+  }, [supabase])
+
+  const handleGetStarted = () => {
+    router.push(session ? '/main' : '/login')
+  }
+
   return (
     <section className="min-h-[calc(100vh-4rem)] flex items-center justify-center">
       <div className="container">
@@ -27,14 +46,12 @@ export function Hero() {
           </p>
           <div className="mt-10 flex gap-4 justify-center">
             <Button 
-              asChild 
+              onClick={handleGetStarted}
               size="lg" 
               className="bg-gradient-to-r from-purple-500 to-blue-500 text-white hover:opacity-90 px-8"
             >
-              <Link href="/login">
-                Get Started
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
+              Get Started
+              <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
             <Button 
               asChild 
@@ -42,9 +59,7 @@ export function Hero() {
               variant="outline" 
               className="border-[#333] text-white hover:bg-[#ffffff10]"
             >
-              <Link href="#">
-                Learn More
-              </Link>
+              <Link href="#">Learn More</Link>
             </Button>
           </div>
         </motion.div>

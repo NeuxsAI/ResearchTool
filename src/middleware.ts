@@ -4,7 +4,6 @@ import type { NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
   const response = NextResponse.next()
-
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -14,11 +13,6 @@ export async function middleware(request: NextRequest) {
           return request.cookies.get(name)?.value
         },
         set(name: string, value: string, options: CookieOptions) {
-          request.cookies.set({
-            name,
-            value,
-            ...options,
-          })
           response.cookies.set({
             name,
             value,
@@ -26,11 +20,6 @@ export async function middleware(request: NextRequest) {
           })
         },
         remove(name: string, options: CookieOptions) {
-          request.cookies.set({
-            name,
-            value: '',
-            ...options,
-          })
           response.cookies.set({
             name,
             value: '',
@@ -41,24 +30,21 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  const { data: { session }, error } = await supabase.auth.getSession()
+  const { data: { session } } = await supabase.auth.getSession()
 
-  // Allow public access to the landing page (root path)
-  if (request.nextUrl.pathname === '/') {
+  // Allow access to auth-related and public pages
+  if (
+    request.nextUrl.pathname === '/' ||
+    request.nextUrl.pathname === '/login' ||
+    request.nextUrl.pathname.startsWith('/auth')
+  ) {
     return response
   }
 
-  // If there's no session and the user is not trying to access the login page
-  if (!session && !request.nextUrl.pathname.startsWith('/main')) {
+  // Redirect to login if accessing protected routes without session
+  if (!session && request.nextUrl.pathname.startsWith('/main')) {
     const redirectUrl = request.nextUrl.clone()
     redirectUrl.pathname = '/login'
-    return NextResponse.redirect(redirectUrl)
-  }
-
-  // If there's a session and the user is trying to access the login page
-  if (session && request.nextUrl.pathname.startsWith('/login')) {
-    const redirectUrl = request.nextUrl.clone()
-    redirectUrl.pathname = '/main'
     return NextResponse.redirect(redirectUrl)
   }
 
@@ -66,5 +52,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico|auth/callback).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 } 
