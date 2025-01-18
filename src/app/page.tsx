@@ -37,7 +37,7 @@ export default function LandingPage() {
       <div className="relative flex flex-col flex-grow">
         <Navbar />
         <main className="flex-grow flex flex-col justify-between">
-          <div className="space-y-32 mb-32">
+          <div className="space-y-20">
             <Hero />
             <EarlyAccess />
           </div>
