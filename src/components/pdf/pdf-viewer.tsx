@@ -73,13 +73,10 @@ export function PDFViewer({ url, onSelection, annotations = [] }: PDFViewerProps
         pdfRef.current = pdf;
         setNumPages(pdf.numPages);
         setIsLoading(false);
-        console.log('PDF loaded, pages:', pdf.numPages);
 
         // Load and render each page
         for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
           if (!mounted) break;
-          
-          console.log('Rendering page:', pageNum);
           const page = await pdf.getPage(pageNum);
           pageRefs.current.set(pageNum, page);
           await renderPage(page, pageNum);
@@ -98,7 +95,6 @@ export function PDFViewer({ url, onSelection, annotations = [] }: PDFViewerProps
       // Setup canvas
       const canvas = document.getElementById(`page-${pageNum}`) as HTMLCanvasElement;
       if (!canvas) {
-        console.error('Canvas not found for page:', pageNum);
         return;
       }
 
@@ -134,6 +130,7 @@ export function PDFViewer({ url, onSelection, annotations = [] }: PDFViewerProps
       // Set text layer dimensions
       textLayerDiv.style.width = `${Math.floor(viewport.width)}px`;
       textLayerDiv.style.height = `${Math.floor(viewport.height)}px`;
+      textLayerDiv.style.setProperty('--scale-factor', scale.toString());
 
       // Get text content
       const textContent = await page.getTextContent();

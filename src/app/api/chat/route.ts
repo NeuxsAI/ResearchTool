@@ -1,36 +1,14 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import OpenAI from "openai";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+export const runtime = 'edge';
+
 export async function POST(request: Request) {
   try {
-    const authHeader = request.headers.get('Authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
-
-    // Get the token and create client
-    const token = authHeader.split(' ')[1];
-    const supabase = createClient(token);
-    
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
-
-    console.log(user)
-
     const { messages, highlightedText } = await request.json();
 
     // Prepare the messages for the API
@@ -53,15 +31,37 @@ export async function POST(request: Request) {
       content: "You are a helpful research assistant. Your goal is to help users understand academic concepts, papers, and research. Provide clear, concise, and accurate responses. When appropriate, cite relevant papers or research to support your explanations.",
     });
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4-1106-preview",
+    // Create stream
+    const stream = await openai.chat.completions.create({
+      model: "gpt-4o",
       messages: apiMessages,
-      temperature: 0.7,
-      max_tokens: 1000,
+      stream: true,
     });
 
-    return NextResponse.json({
-      message: completion.choices[0].message.content,
+    // Create a TransformStream to handle the streaming response
+    const encoder = new TextEncoder();
+    const customStream = new TransformStream({
+      async transform(chunk, controller) {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: chunk.choices[0]?.delta?.content || "" })}\n\n`));
+      },
+    });
+
+    // Pipe the OpenAI stream through our transform stream
+    const readable = new ReadableStream({
+      async start(controller) {
+        for await (const chunk of stream) {
+          controller.enqueue(chunk);
+        }
+        controller.close();
+      },
+    });
+
+    return new Response(readable.pipeThrough(customStream), {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      },
     });
   } catch (error) {
     console.error("Chat API error:", error);

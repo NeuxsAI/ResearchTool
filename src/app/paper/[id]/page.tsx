@@ -27,6 +27,15 @@ interface Selection {
   position: { x: number; y: number };
 }
 
+interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+  timestamp: string;
+  annotationId?: string;
+  highlightText?: string;
+  isStreaming?: boolean;
+}
+
 export default function PaperPage() {
   const params = useParams();
   const [paper, setPaper] = useState<Paper | null>(null);
@@ -41,6 +50,8 @@ export default function PaperPage() {
     created_at: string;
   }>>([]);
   const [highlightedText, setHighlightedText] = useState<string | undefined>();
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [isChatLoading, setIsChatLoading] = useState(false);
 
   useEffect(() => {
     async function loadPaper() {
@@ -147,6 +158,100 @@ export default function PaperPage() {
     }, 100); // Small delay to ensure sidebar is open
   };
 
+  const handleSendMessage = async (content: string, highlightedText?: string) => {
+    try {
+      setIsChatLoading(true);
+      
+      // Add user message immediately
+      const userMessage: ChatMessage = {
+        role: "user",
+        content,
+        timestamp: new Date().toISOString(),
+        highlightText: highlightedText
+      };
+      setChatMessages(prev => [...prev, userMessage]);
+
+      // Create initial streaming message
+      const streamingMessage: ChatMessage = {
+        role: "assistant",
+        content: "",
+        timestamp: new Date().toISOString(),
+        highlightText: highlightedText,
+        isStreaming: true
+      };
+      setChatMessages(prev => [...prev, streamingMessage]);
+
+      // Send to API
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: [...chatMessages, userMessage],
+          highlightedText,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to get response");
+      }
+
+      if (!response.body) {
+        throw new Error("No response body");
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+
+      let accumulatedContent = "";
+      
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n');
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              accumulatedContent += data.content || "";
+              
+              // Update the streaming message with accumulated content
+              setChatMessages(prev => {
+                const newMessages = [...prev];
+                const lastMessage = newMessages[newMessages.length - 1];
+                if (lastMessage && lastMessage.isStreaming) {
+                  lastMessage.content = accumulatedContent;
+                }
+                return newMessages;
+              });
+            } catch (e) {
+              console.error("Error parsing SSE data:", e);
+            }
+          }
+        }
+      }
+
+      // Mark message as done streaming
+      setChatMessages(prev => {
+        const newMessages = [...prev];
+        const lastMessage = newMessages[newMessages.length - 1];
+        if (lastMessage && lastMessage.isStreaming) {
+          lastMessage.isStreaming = false;
+        }
+        return newMessages;
+      });
+    } catch (error) {
+      console.error("Chat error:", error);
+      toast.error("Failed to send message");
+    } finally {
+      setIsChatLoading(false);
+    }
+  };
+
   if (isLoading) {
     return <MainLayout>
       <div className="h-full flex items-center justify-center">
@@ -216,18 +321,33 @@ export default function PaperPage() {
         </div>
 
         {/* PDF Viewer */}
-        <div className="flex-1">
+        <div className="flex-1 relative">
           {paper.url ? (
             <PDFViewer 
               url={paper.url} 
               onSelection={handleTextSelection}
               annotations={annotations}
+              onAnnotationClick={handleAnnotationClick}
             />
           ) : (
             <div className="h-full flex items-center justify-center text-[#888]">
               No PDF available for this paper
             </div>
           )}
+          
+          <AnnotationSidebar
+            open={isAnnotationSidebarOpen}
+            onClose={() => {
+              setIsAnnotationSidebarOpen(false);
+              setHighlightedText(undefined);
+            }}
+            onSave={handleSaveAnnotation}
+            onSendMessage={handleSendMessage}
+            annotations={annotations}
+            highlightedText={highlightedText}
+            chatMessages={chatMessages}
+            isChatLoading={isChatLoading}
+          />
         </div>
       </div>
 
@@ -237,18 +357,6 @@ export default function PaperPage() {
         onOpenChange={setIsEditPaperOpen}
         paper={paper}
         onSave={handleUpdatePaper}
-      />
-
-      {/* Annotation Sidebar */}
-      <AnnotationSidebar
-        open={isAnnotationSidebarOpen}
-        onClose={() => {
-          setIsAnnotationSidebarOpen(false);
-          setHighlightedText(undefined);
-        }}
-        onSave={handleSaveAnnotation}
-        annotations={annotations}
-        highlightedText={highlightedText}
       />
 
       <style jsx global>{`
