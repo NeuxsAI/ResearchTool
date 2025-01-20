@@ -28,12 +28,13 @@ interface Selection {
 }
 
 interface ChatMessage {
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "system";
   content: string;
   timestamp: string;
   annotationId?: string;
   highlightText?: string;
   isStreaming?: boolean;
+  chat_history?: ChatMessage[];
 }
 
 export default function PaperPage() {
@@ -48,6 +49,7 @@ export default function PaperPage() {
     content: string;
     highlight_text?: string;
     created_at: string;
+    chat_history?: ChatMessage[];
   }>>([]);
   const [highlightedText, setHighlightedText] = useState<string | undefined>();
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -133,9 +135,29 @@ export default function PaperPage() {
     }
   };
 
+  // Simple text selection handler
   const handleTextSelection = (text: string) => {
-    setHighlightedText(text);
-    setIsAnnotationSidebarOpen(true);
+    console.log('Selection handler called with:', text);
+    // If no text or empty text, clear the highlight
+    if (!text || text.trim() === "") {
+      setHighlightedText(undefined);
+      return;
+    }
+    setHighlightedText(text.trim());
+  };
+
+  // Effect ONLY handles opening the sidebar when there's text
+  useEffect(() => {
+    console.log('useEffect triggered. highlightedText:', highlightedText);
+    if (highlightedText) {
+      setIsAnnotationSidebarOpen(true);
+    }
+  }, [highlightedText]);
+
+  const handleSidebarClose = () => {
+    console.log('Sidebar closing, clearing highlight');
+    setIsAnnotationSidebarOpen(false);
+    setHighlightedText(undefined);
   };
 
   const handleAnnotationClick = (annotationId: string) => {
@@ -158,16 +180,73 @@ export default function PaperPage() {
     }, 100); // Small delay to ensure sidebar is open
   };
 
+  const handleSaveChat = async () => {
+    try {
+      // Get the first message as title/summary
+      const firstMessage = chatMessages[0];
+      if (!firstMessage) return;
+
+      // Create a new annotation with the chat
+      const { data: annotation, error } = await createAnnotation({
+        paper_id: paper?.id as string,
+        content: firstMessage.content.slice(0, 100) + "...", // First message as summary
+        highlight_text: firstMessage.highlightText,
+        chat_history: chatMessages
+      });
+
+      if (error) throw error;
+
+      // Refresh annotations
+      const { data: updatedAnnotations } = await getAnnotationsByPaper(paper?.id as string);
+      setAnnotations(updatedAnnotations || []);
+
+      // Reset chat messages after successful save
+      setChatMessages([]);
+      
+      toast.success("Chat saved as annotation");
+    } catch (error) {
+      console.error("Error saving chat:", error);
+      toast.error("Failed to save chat");
+    }
+  };
+
+  const handleStartChat = (annotation: typeof annotations[0]) => {
+    // If there's existing chat history, load it
+    if (annotation.chat_history?.length) {
+      setChatMessages(annotation.chat_history);
+    } else {
+      // Start new chat with annotation content as context
+      const initialMessage: ChatMessage = {
+        role: "system",
+        content: `Context: ${annotation.content}${annotation.highlight_text ? `\n\nHighlighted text: ${annotation.highlight_text}` : ""}`,
+        timestamp: new Date().toISOString(),
+        annotationId: annotation.id
+      };
+      setChatMessages([initialMessage]);
+    }
+  };
+
   const handleSendMessage = async (content: string, highlightedText?: string) => {
     try {
       setIsChatLoading(true);
+      
+      // If this is the first message and we have highlighted text, add it as context
+      if (chatMessages.length === 0 && highlightedText) {
+        const contextMessage: ChatMessage = {
+          role: "system",
+          content: highlightedText,
+          timestamp: new Date().toISOString(),
+          highlightText: highlightedText
+        };
+        setChatMessages([contextMessage]);
+      }
       
       // Add user message immediately
       const userMessage: ChatMessage = {
         role: "user",
         content,
         timestamp: new Date().toISOString(),
-        highlightText: highlightedText
+        highlightText: highlightedText // Include current highlight with message
       };
       setChatMessages(prev => [...prev, userMessage]);
 
@@ -176,12 +255,12 @@ export default function PaperPage() {
         role: "assistant",
         content: "",
         timestamp: new Date().toISOString(),
-        highlightText: highlightedText,
+        highlightText: highlightedText, // Include current highlight with response
         isStreaming: true
       };
       setChatMessages(prev => [...prev, streamingMessage]);
 
-      // Send to API
+      // Send to API with all messages including context
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: {
@@ -249,6 +328,14 @@ export default function PaperPage() {
       toast.error("Failed to send message");
     } finally {
       setIsChatLoading(false);
+    }
+  };
+
+  // Add this new handler
+  const handleContainerClick = (e: React.MouseEvent) => {
+    // Only clear if clicking the container itself, not a selection
+    if (e.target === e.currentTarget) {
+      setHighlightedText(undefined);
     }
   };
 
@@ -322,13 +409,15 @@ export default function PaperPage() {
 
         {/* PDF Viewer */}
         <div className="flex-1 relative">
-          {paper.url ? (
-            <PDFViewer 
-              url={paper.url} 
-              onSelection={handleTextSelection}
-              annotations={annotations}
-              onAnnotationClick={handleAnnotationClick}
-            />
+          {paper?.url ? (
+            <div onClick={handleContainerClick} className="h-full relative">
+              <PDFViewer 
+                url={paper.url} 
+                onSelection={handleTextSelection}
+                annotations={annotations}
+                onAnnotationClick={handleAnnotationClick}
+              />
+            </div>
           ) : (
             <div className="h-full flex items-center justify-center text-[#888]">
               No PDF available for this paper
@@ -337,12 +426,12 @@ export default function PaperPage() {
           
           <AnnotationSidebar
             open={isAnnotationSidebarOpen}
-            onClose={() => {
-              setIsAnnotationSidebarOpen(false);
-              setHighlightedText(undefined);
-            }}
+            onClose={handleSidebarClose}
             onSave={handleSaveAnnotation}
             onSendMessage={handleSendMessage}
+            onSaveChat={handleSaveChat}
+            onStartChat={handleStartChat}
+            onClearHighlight={() => setHighlightedText(undefined)}
             annotations={annotations}
             highlightedText={highlightedText}
             chatMessages={chatMessages}

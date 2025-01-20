@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { X, MessageSquare } from "lucide-react";
+import { X, MessageSquare, MessageCircle } from "lucide-react";
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChatView } from "./chat-view";
@@ -21,6 +21,14 @@ interface AnnotationSidebarProps {
   onSave: (content: string, highlightedText?: string) => Promise<void>;
   onSendMessage: (content: string, highlightedText?: string) => Promise<void>;
   onSaveChat?: (messages: ChatMessage[]) => Promise<void>;
+  onStartChat: (annotation: {
+    id: string;
+    content: string;
+    highlight_text?: string;
+    created_at: string;
+    chat_history?: ChatMessage[];
+  }) => void;
+  onClearHighlight: () => void;
   annotations?: Array<{
     id: string;
     content: string;
@@ -39,6 +47,8 @@ export function AnnotationSidebar({
   onSave,
   onSendMessage,
   onSaveChat,
+  onStartChat,
+  onClearHighlight,
   annotations = [], 
   highlightedText,
   chatMessages = [],
@@ -46,6 +56,7 @@ export function AnnotationSidebar({
 }: AnnotationSidebarProps) {
   const [content, setContent] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>("annotations");
 
   const handleSave = async () => {
     if (!content.trim()) return;
@@ -64,6 +75,11 @@ export function AnnotationSidebar({
   const handleSaveChat = async () => {
     if (!onSaveChat || chatMessages.length === 0) return;
     await onSaveChat(chatMessages);
+  };
+
+  const handleStartChat = (annotation: typeof annotations[0]) => {
+    onStartChat(annotation);
+    setActiveTab("chat");
   };
 
   return (
@@ -88,8 +104,8 @@ export function AnnotationSidebar({
         </Button>
       </div>
 
-      <Tabs defaultValue="annotations" className="flex-1 flex flex-col">
-        <TabsList className="flex bg-[#1c1c1c] border-b border-[#2a2a2a] justify-start w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
+        <TabsList className="flex-shrink-0 flex bg-[#1c1c1c] border-b border-[#2a2a2a] justify-start w-full">
           <TabsTrigger 
             value="annotations"
             className="h-[24px] px-3 text-[8px] uppercase tracking-wider font-medium data-[state=active]:bg-transparent rounded-none border-b border-transparent data-[state=active]:border-violet-500"
@@ -104,9 +120,9 @@ export function AnnotationSidebar({
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="annotations" className="flex-1 mt-0 p-0 border-none data-[state=active]:flex flex-col">
+        <TabsContent value="annotations" className="flex-1 mt-0 p-0 border-none data-[state=active]:flex flex-col min-h-0">
           {/* Annotations List */}
-          <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-[#333] scrollbar-track-transparent">
+          <div className="flex-1 overflow-y-auto min-h-0">
             <div className="p-3 space-y-2">
               {annotations.map((annotation, index) => (
                 <div 
@@ -125,20 +141,46 @@ export function AnnotationSidebar({
                         </div>
                       )}
                       <p className="text-[11px] text-white leading-relaxed">{annotation.content}</p>
-                      <p className="text-[9px] text-[#666]">
-                        {new Date(annotation.created_at).toLocaleString()}
-                      </p>
+                      <div className="flex items-center justify-between">
+                        <p className="text-[9px] text-[#666]">
+                          {new Date(annotation.created_at).toLocaleString()}
+                        </p>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleStartChat(annotation)}
+                          className="h-5 px-2 text-[8px] uppercase font-medium text-violet-400 hover:text-violet-300 hover:bg-violet-500/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <MessageCircle className="h-3 w-3 mr-1" />
+                          Chat
+                        </Button>
+                      </div>
                       {annotation.chat_history && annotation.chat_history.length > 0 && (
                         <div className="mt-2 pt-2 border-t border-[#333]">
-                          <p className="text-[10px] text-violet-400 mb-1.5">Chat Thread</p>
-                          {annotation.chat_history.map((msg, i) => (
-                            <div key={i} className="text-[10px] text-[#aaa] mb-1.5">
-                              <span className={msg.role === "assistant" ? "text-emerald-500" : "text-violet-500"}>
-                                {msg.role === "assistant" ? "AI: " : "You: "}
-                              </span>
-                              {msg.content}
-                            </div>
-                          ))}
+                          <div className="flex items-center justify-between mb-1.5">
+                            <p className="text-[10px] text-violet-400">Chat Thread ({annotation.chat_history.length} messages)</p>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleStartChat(annotation)}
+                              className="h-5 px-2 text-[8px] uppercase font-medium text-violet-400 hover:text-violet-300 hover:bg-violet-500/10"
+                            >
+                              Continue
+                            </Button>
+                          </div>
+                          <div className="max-h-[100px] overflow-hidden relative">
+                            {annotation.chat_history.slice(0, 3).map((msg, i) => (
+                              <div key={i} className="text-[10px] text-[#aaa] mb-1.5">
+                                <span className={msg.role === "assistant" ? "text-emerald-500" : "text-violet-500"}>
+                                  {msg.role === "assistant" ? "AI: " : "You: "}
+                                </span>
+                                {msg.content.length > 150 ? `${msg.content.slice(0, 150)}...` : msg.content}
+                              </div>
+                            ))}
+                            {annotation.chat_history.length > 3 && (
+                              <div className="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-[#2a2a2a] to-transparent" />
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -148,11 +190,21 @@ export function AnnotationSidebar({
             </div>
           </div>
 
-          {/* Add Comment */}
-          <div className="flex-shrink-0 p-3 border-t border-[#2a2a2a]">
-            {highlightedText && (
-              <div className="mb-2 p-2 bg-[#2a2a2a] border-l border-violet-500/30 rounded">
-                <p className="text-[10px] text-[#999] leading-relaxed">{highlightedText}</p>
+          {/* Add Comment - Fixed at bottom */}
+          <div className="flex-shrink-0 p-3 border-t border-[#2a2a2a] bg-[#1c1c1c]">
+            {highlightedText && highlightedText.trim() !== "" && (
+              <div className="mb-2 p-2 bg-[#2a2a2a] border-l border-violet-500/30 rounded relative group">
+                <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={onClearHighlight}
+                    className="h-4 w-4 p-0 hover:bg-[#333]"
+                  >
+                    <X className="h-3 w-3 text-[#666]" />
+                  </Button>
+                </div>
+                <p className="text-[10px] text-[#999] leading-relaxed pr-4">{highlightedText}</p>
               </div>
             )}
             <div className="relative bg-[#2a2a2a] rounded border border-[#333] shadow-sm">
@@ -177,13 +229,14 @@ export function AnnotationSidebar({
           </div>
         </TabsContent>
 
-        <TabsContent value="chat" className="flex-1 mt-0 p-0 border-none data-[state=active]:flex flex-col">
+        <TabsContent value="chat" className="flex-1 mt-0 p-0 border-none data-[state=active]:flex flex-col min-h-0">
           <ChatView
             messages={chatMessages}
             onSendMessage={(content) => onSendMessage(content, highlightedText)}
             highlightedText={highlightedText}
             isLoading={isChatLoading}
             onSaveChat={onSaveChat ? handleSaveChat : undefined}
+            onClearHighlight={onClearHighlight}
           />
         </TabsContent>
       </Tabs>
