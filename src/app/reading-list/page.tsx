@@ -23,12 +23,21 @@ import {
   SortAsc,
   Sparkles,
   BookMarked,
-  Star
+  Star,
+  Calendar as CalendarIcon2,
+  Trophy,
+  Tags,
+  TrendingUp,
+  Clock as ClockIcon,
+  Zap,
+  Layers,
+  Brain
 } from "lucide-react";
 import { format } from "date-fns";
 import { MainLayout } from "@/components/layout/main-layout";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
 
 interface Paper {
   id: string;
@@ -38,6 +47,10 @@ interface Paper {
   category_id?: string;
   scheduled_date?: string;
   estimated_time?: number;
+  abstract?: string;
+  citations?: number;
+  institution?: string;
+  impact?: string;
 }
 
 interface ReadingListItem {
@@ -69,6 +82,17 @@ const itemVariants = {
   }
 };
 
+const loadingVariants = {
+  animate: {
+    opacity: [0.5, 1],
+    transition: {
+      duration: 0.8,
+      repeat: Infinity,
+      repeatType: "reverse" as const
+    }
+  }
+};
+
 export default function ReadingListPage() {
   const router = useRouter();
   const [date, setDate] = useState<Date>(new Date());
@@ -80,6 +104,56 @@ export default function ReadingListPage() {
   const [activeTab, setActiveTab] = useState<"schedule" | "discover">("schedule");
   const [sortBy, setSortBy] = useState<"relevance" | "citations" | "date">("relevance");
   const [dateRange, setDateRange] = useState<"all" | "recent" | "last-year">("all");
+  const [selectedDateRange, setSelectedDateRange] = useState<string>("all-time");
+  const [selectedImpact, setSelectedImpact] = useState<string>("any-impact");
+  const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<Paper[]>([]);
+
+  const exampleQueries = [
+    { text: "Attention mechanisms", icon: Sparkles },
+    { text: "Geoffrey Hinton", icon: BookOpen },
+    { text: "Large language models", icon: Brain }
+  ];
+
+  const handleExampleQuery = (query: string) => {
+    setSearchQuery(query);
+    handleSearch(null, query);
+  };
+
+  const handleSearch = async (e: React.FormEvent | null, exampleQuery?: string) => {
+    if (e) e.preventDefault();
+    const query = exampleQuery || searchQuery;
+    
+    if (query.trim()) {
+      setIsSearching(true);
+      setHasSearched(true);
+      
+      try {
+        // TODO: Replace with actual API call
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        setSearchResults([
+          // Mock results for now
+          {
+            id: "1",
+            title: "Attention Is All You Need",
+            abstract: "We propose a new simple network architecture, the Transformer, based solely on attention mechanisms...",
+            citations: 52000,
+            year: 2017,
+            institution: "Google Research",
+            impact: "high"
+          },
+          // Add more mock results...
+        ]);
+      } catch (error) {
+        console.error("Search error:", error);
+        // TODO: Add error handling
+      } finally {
+        setIsSearching(false);
+      }
+    }
+  };
 
   useEffect(() => {
     async function loadData() {
@@ -173,34 +247,47 @@ export default function ReadingListPage() {
 
             {activeTab === "discover" && (
               <div className="space-y-3">
-                <div className="relative">
+                <form onSubmit={handleSearch} className="relative">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#666]" />
                   <Input
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      if (e.target.value === "") setHasSearched(false);
+                    }}
                     placeholder="Search for papers, authors, or topics..."
                     className="pl-8 h-8 text-[11px] bg-[#2a2a2a] border-[#333] focus:ring-1 focus:ring-violet-500/30"
                   />
-                </div>
+                </form>
                 <div className="flex items-center gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowFilters(!showFilters)}
-                    className="h-7 px-2.5 text-[11px] hover:bg-[#2a2a2a] text-[#888]"
-                  >
-                    <Filter className="h-3.5 w-3.5 mr-1.5" />
-                    Filters
-                  </Button>
-                  <Badge variant="secondary" className="bg-[#2a2a2a] text-[#888] hover:bg-[#333]">
-                    Last year
-                  </Badge>
-                  <Badge variant="secondary" className="bg-[#2a2a2a] text-[#888] hover:bg-[#333]">
-                    High impact
-                  </Badge>
-                  <Badge variant="secondary" className="bg-[#2a2a2a] text-[#888] hover:bg-[#333]">
-                    Machine Learning
-                  </Badge>
+                  {selectedDateRange !== "all-time" && (
+                    <Badge 
+                      variant="secondary" 
+                      className="bg-[#2a2a2a] text-[#888] hover:bg-[#333] cursor-pointer"
+                      onClick={() => setSelectedDateRange("all-time")}
+                    >
+                      {selectedDateRange.split("-").map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(" ")} ×
+                    </Badge>
+                  )}
+                  {selectedImpact !== "any-impact" && (
+                    <Badge 
+                      variant="secondary" 
+                      className="bg-[#2a2a2a] text-[#888] hover:bg-[#333] cursor-pointer"
+                      onClick={() => setSelectedImpact("any-impact")}
+                    >
+                      {selectedImpact.split("-").map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(" ")} ×
+                    </Badge>
+                  )}
+                  {selectedTopics.map(topic => (
+                    <Badge 
+                      key={topic}
+                      variant="secondary" 
+                      className="bg-[#2a2a2a] text-[#888] hover:bg-[#333] cursor-pointer"
+                      onClick={() => setSelectedTopics(prev => prev.filter(t => t !== topic))}
+                    >
+                      {topic.split("-").map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(" ")} ×
+                    </Badge>
+                  ))}
                   <div className="flex-1" />
                   <Button
                     variant="ghost"
@@ -217,236 +304,429 @@ export default function ReadingListPage() {
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 min-h-0 p-4">
-          <div className="h-full flex gap-4">
-            {/* Papers List */}
-            <div className="flex-1 min-w-0">
-              <ScrollArea className="h-full">
-                <Tabs value={activeTab} className="w-full">
-                <TabsContent value="discover" className="m-0">
-                  {/* Search Results */}
-                  <motion.div 
-                    className="space-y-2"
-                    variants={containerVariants}
-                    initial="hidden"
-                    animate="visible"
-                  >
-                    {[1,2,3].map((_, i) => (
-                      <motion.div key={i} variants={itemVariants}>
-                        <Card className="p-3 hover:bg-[#2a2a2a] transition-colors cursor-pointer border-[#2a2a2a]">
-                          <div className="flex items-start gap-3">
-                            <div className="flex-shrink-0 w-10 h-10 rounded bg-[#2a2a2a] flex items-center justify-center">
-                              <FileText className="h-5 w-5 text-[#666]" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-1">
-                                <h3 className="text-sm font-medium text-white truncate">
-                                  Attention Is All You Need
-                                </h3>
-                                <Badge className="bg-violet-500/10 text-violet-500 hover:bg-violet-500/20">
-                                  High Impact
-                                </Badge>
-                              </div>
-                              <p className="text-xs text-[#888] mb-2 line-clamp-2">
-                                We propose a new simple network architecture, the Transformer, based solely on attention mechanisms...
-                              </p>
-                              <div className="flex items-center gap-3 text-[11px] text-[#666]">
-                                <span className="flex items-center gap-1">
-                                  <Star className="h-3 w-3" />
-                                  52,000 citations
-                                </span>
-                                <span>2017</span>
-                                <span>Google Research</span>
-                              </div>
-                            </div>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 px-2.5 text-[11px] hover:bg-[#333] text-white bg-[#2a2a2a]"
-                            >
-                              <BookMarked className="h-3.5 w-3.5 mr-1.5" />
-                              Add to list
-                            </Button>
-                          </div>
-                        </Card>
-                      </motion.div>
+        <div className="flex-1 min-h-0 flex">
+          {/* Filters Panel - Now on the left */}
+          {activeTab === "discover" && (
+            <div className="w-[240px] border-r border-[#2a2a2a] bg-[#1c1c1c] overflow-y-auto">
+              <div className="p-4 space-y-6">
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <CalendarIcon2 className="h-3.5 w-3.5 text-blue-500" />
+                    <h4 className="text-xs font-medium text-white">Date Range</h4>
+                  </div>
+                  <div className="space-y-1">
+                    {[
+                      { value: "all-time", label: "All time", icon: Layers },
+                      { value: "last-year", label: "Last year", icon: CalendarIcon },
+                      { value: "last-6-months", label: "Last 6 months", icon: ClockIcon },
+                      { value: "last-month", label: "Last month", icon: CalendarDays }
+                    ].map(({ value, label, icon: Icon }) => (
+                      <Button
+                        key={value}
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSelectedDateRange(value)}
+                        className={cn(
+                          "w-full justify-start h-7 text-[11px] group",
+                          selectedDateRange === value 
+                            ? "bg-[#2a2a2a] text-white" 
+                            : "text-[#888] hover:bg-[#2a2a2a]"
+                        )}
+                      >
+                        <Icon className={cn(
+                          "h-3.5 w-3.5 mr-2",
+                          selectedDateRange === value 
+                            ? "text-blue-500" 
+                            : "text-[#666] group-hover:text-[#888]"
+                        )} />
+                        {label}
+                      </Button>
                     ))}
-                  </motion.div>
-                </TabsContent>
+                  </div>
+                </div>
 
-                <TabsContent value="schedule" className="m-0">
-                  {/* Existing Reading List Content */}
-                  {isLoading ? (
-                    <div className="space-y-3">
-                      {[...Array(5)].map((_, i) => (
-                        <Card key={i} className="p-3 bg-[#1c1c1c] border-[#2a2a2a]">
-                          <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded bg-[#2a2a2a] animate-pulse" />
-                            <div className="flex-1">
-                              <div className="h-4 w-2/3 bg-[#2a2a2a] rounded animate-pulse mb-2" />
-                              <div className="h-3 w-1/3 bg-[#2a2a2a] rounded animate-pulse" />
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Trophy className="h-3.5 w-3.5 text-amber-500" />
+                    <h4 className="text-xs font-medium text-white">Impact</h4>
+                  </div>
+                  <div className="space-y-1">
+                    {[
+                      { value: "any-impact", label: "Any impact", icon: Layers },
+                      { value: "high-impact", label: "High impact", icon: Zap },
+                      { value: "rising-stars", label: "Rising stars", icon: TrendingUp }
+                    ].map(({ value, label, icon: Icon }) => (
+                      <Button
+                        key={value}
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSelectedImpact(value)}
+                        className={cn(
+                          "w-full justify-start h-7 text-[11px] group",
+                          selectedImpact === value 
+                            ? "bg-[#2a2a2a] text-white" 
+                            : "text-[#888] hover:bg-[#2a2a2a]"
+                        )}
+                      >
+                        <Icon className={cn(
+                          "h-3.5 w-3.5 mr-2",
+                          selectedImpact === value 
+                            ? "text-amber-500" 
+                            : "text-[#666] group-hover:text-[#888]"
+                        )} />
+                        {label}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Tags className="h-3.5 w-3.5 text-violet-500" />
+                    <h4 className="text-xs font-medium text-white">Topics</h4>
+                  </div>
+                  <div className="space-y-1">
+                    {[
+                      { value: "machine-learning", label: "Machine Learning", color: "bg-blue-500" },
+                      { value: "computer-vision", label: "Computer Vision", color: "bg-green-500" },
+                      { value: "nlp", label: "Natural Language Processing", color: "bg-violet-500" },
+                      { value: "reinforcement-learning", label: "Reinforcement Learning", color: "bg-amber-500" }
+                    ].map(({ value, label, color }) => (
+                      <Button
+                        key={value}
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedTopics(prev => 
+                            prev.includes(value) 
+                              ? prev.filter(t => t !== value)
+                              : [...prev, value]
+                          )
+                        }}
+                        className={cn(
+                          "w-full justify-start h-7 text-[11px] group",
+                          selectedTopics.includes(value)
+                            ? "bg-[#2a2a2a] text-white"
+                            : "text-[#888] hover:bg-[#2a2a2a]"
+                        )}
+                      >
+                        <div className={cn(
+                          "w-1.5 h-1.5 rounded-full mr-2",
+                          selectedTopics.includes(value) ? color : "bg-[#666]"
+                        )} />
+                        {label}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Main Content Area */}
+          <div className="flex-1 min-w-0 p-4">
+            <div className="h-full flex gap-4">
+              {/* Papers List */}
+              <div className="flex-1 min-w-0">
+                <ScrollArea className="h-full">
+                  <Tabs value={activeTab} className="w-full">
+                    <TabsContent value="discover" className="m-0">
+                      {!hasSearched ? (
+                        <div className="h-[calc(100vh-12rem)] flex flex-col items-center justify-center text-center px-4">
+                          <div className="w-full max-w-md space-y-4">
+                            <div className="flex justify-center">
+                              <div className="w-12 h-12 rounded-full bg-violet-500/10 flex items-center justify-center">
+                                <Search className="h-6 w-6 text-violet-500" />
+                              </div>
+                            </div>
+                            <div>
+                              <h3 className="text-lg font-medium text-white mb-2">Search for Research Papers</h3>
+                              <p className="text-sm text-[#888]">
+                                Enter a topic, author, or paper title to discover relevant research papers
+                              </p>
+                            </div>
+                            <div className="flex flex-wrap gap-2 justify-center">
+                              {exampleQueries.map(({ text, icon: Icon }) => (
+                                <Badge 
+                                  key={text}
+                                  variant="secondary" 
+                                  className="bg-[#2a2a2a] text-[#888] hover:bg-[#333] cursor-pointer flex items-center gap-1.5 group"
+                                  onClick={() => handleExampleQuery(text)}
+                                >
+                                  <Icon className="h-3 w-3 text-[#666] group-hover:text-[#888]" />
+                                  {text}
+                                </Badge>
+                              ))}
                             </div>
                           </div>
-                        </Card>
-                      ))}
-                    </div>
-                  ) : (
-                    <motion.div 
-                      className="space-y-6"
-                      variants={containerVariants}
-                      initial="hidden"
-                      animate="visible"
-                    >
-                      {/* Today's Reading */}
-                      <motion.div variants={itemVariants}>
-                        <div className="flex items-center gap-2 mb-3">
-                          <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                          <h3 className="text-[11px] font-medium text-[#888]">Today</h3>
                         </div>
-                        <div className="space-y-1">
-                          {papersByDate[format(new Date(), "yyyy-MM-dd")]?.map((paper) => (
-                            <Card 
-                              key={paper.id}
-                              className="flex items-start gap-2 p-2 hover:bg-[#2a2a2a] transition-colors group border-[#2a2a2a] cursor-pointer"
-                              onClick={() => handlePaperClick(paper)}
-                            >
-                              <div className="flex-shrink-0 w-8 h-8 rounded bg-[#2a2a2a] flex items-center justify-center group-hover:bg-[#333]">
-                                <FileText className="h-4 w-4 text-[#666]" />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-1.5 mb-0.5">
-                                  {paper.estimated_time && (
-                                    <span className="text-[10px] text-[#666] flex items-center gap-0.5">
-                                      <Clock className="h-3 w-3" />
-                                      {paper.estimated_time} min
-                                    </span>
-                                  )}
+                      ) : (
+                        <motion.div 
+                          className="space-y-2"
+                          variants={containerVariants}
+                          initial="hidden"
+                          animate="visible"
+                        >
+                          {isSearching ? (
+                            [...Array(3)].map((_, i) => (
+                              <motion.div 
+                                key={i}
+                                variants={loadingVariants}
+                                animate="animate"
+                                className="p-3 border border-[#2a2a2a] rounded-xl"
+                              >
+                                <div className="flex items-start gap-3">
+                                  <div className="flex-shrink-0 w-10 h-10 rounded bg-[#2a2a2a]" />
+                                  <div className="flex-1 min-w-0 space-y-2">
+                                    <div className="h-5 bg-[#2a2a2a] rounded w-2/3" />
+                                    <div className="h-4 bg-[#2a2a2a] rounded w-full" />
+                                    <div className="h-4 bg-[#2a2a2a] rounded w-1/2" />
+                                  </div>
                                 </div>
-                                <h3 className="text-[11px] font-medium text-white truncate leading-snug mb-0.5">
-                                  {paper.title}
-                                </h3>
-                                {paper.authors && (
-                                  <p className="text-[10px] text-[#666] truncate">
-                                    {paper.authors.join(", ")}
+                              </motion.div>
+                            ))
+                          ) : searchResults.length > 0 ? (
+                            searchResults.map((paper, i) => (
+                              <motion.div 
+                                key={paper.id} 
+                                variants={itemVariants}
+                                whileHover={{ scale: 1.01 }}
+                                whileTap={{ scale: 0.99 }}
+                              >
+                                <Card className="p-3 hover:bg-[#2a2a2a] transition-colors cursor-pointer border-[#2a2a2a]">
+                                  <div className="flex items-start gap-3">
+                                    <div className="flex-shrink-0 w-10 h-10 rounded bg-[#2a2a2a] flex items-center justify-center">
+                                      <FileText className="h-5 w-5 text-[#666]" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-2 mb-1">
+                                        <h3 className="text-sm font-medium text-white truncate">
+                                          {paper.title}
+                                        </h3>
+                                        <Badge className="bg-violet-500/10 text-violet-500 hover:bg-violet-500/20">
+                                          {paper.impact === "high" ? "High Impact" : "Low Impact"}
+                                        </Badge>
+                                      </div>
+                                      <p className="text-xs text-[#888] mb-2 line-clamp-2">
+                                        {paper.abstract}
+                                      </p>
+                                      <div className="flex items-center gap-3 text-[11px] text-[#666]">
+                                        <span className="flex items-center gap-1">
+                                          <Star className="h-3 w-3" />
+                                          {paper.citations} citations
+                                        </span>
+                                        <span>{paper.year}</span>
+                                        <span>{paper.institution}</span>
+                                      </div>
+                                    </div>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-7 px-2.5 text-[11px] hover:bg-[#333] text-white bg-[#2a2a2a]"
+                                    >
+                                      <BookMarked className="h-3.5 w-3.5 mr-1.5" />
+                                      Add to list
+                                    </Button>
+                                  </div>
+                                </Card>
+                              </motion.div>
+                            ))
+                          ) : (
+                            <motion.div 
+                              variants={itemVariants}
+                              className="h-[calc(100vh-16rem)] flex flex-col items-center justify-center text-center"
+                            >
+                              <div className="w-full max-w-md space-y-4">
+                                <div className="flex justify-center">
+                                  <div className="w-12 h-12 rounded-full bg-[#2a2a2a] flex items-center justify-center">
+                                    <FileText className="h-6 w-6 text-[#666]" />
+                                  </div>
+                                </div>
+                                <div>
+                                  <h3 className="text-lg font-medium text-white mb-2">No papers found</h3>
+                                  <p className="text-sm text-[#888]">
+                                    Try adjusting your search terms or filters
                                   </p>
-                                )}
+                                </div>
                               </div>
-                            </Card>
-                          ))}
-                          {!papersByDate[format(new Date(), "yyyy-MM-dd")]?.length && (
-                            <div className="text-center py-4 text-sm text-[#666]">
-                              No papers scheduled for today
-                            </div>
+                            </motion.div>
                           )}
-                        </div>
-                      </motion.div>
+                        </motion.div>
+                      )}
+                    </TabsContent>
 
-                      {/* This Week */}
-                      <motion.div variants={itemVariants}>
-                        <div className="flex items-center gap-2 mb-3">
-                          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                          <h3 className="text-[11px] font-medium text-[#888]">This Week</h3>
-                        </div>
-                        <div className="space-y-1">
-                          {thisWeekPapers.map((paper) => (
-                            <Card 
-                              key={paper.id}
-                              className="flex items-start gap-2 p-2 hover:bg-[#2a2a2a] transition-colors group border-[#2a2a2a] cursor-pointer"
-                              onClick={() => handlePaperClick(paper)}
-                            >
-                              <div className="flex-shrink-0 w-8 h-8 rounded bg-[#2a2a2a] flex items-center justify-center group-hover:bg-[#333]">
-                                <FileText className="h-4 w-4 text-[#666]" />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-1.5 mb-0.5">
-                                  {paper.scheduled_date && (
-                                    <span className="text-[10px] text-[#666] flex items-center gap-0.5">
-                                      <CalendarIcon className="h-3 w-3" />
-                                      {format(new Date(paper.scheduled_date), "MMM d")}
-                                    </span>
-                                  )}
-                                  {paper.estimated_time && (
-                                    <span className="text-[10px] text-[#666] flex items-center gap-0.5">
-                                      <Clock className="h-3 w-3" />
-                                      {paper.estimated_time} min
-                                    </span>
-                                  )}
+                    <TabsContent value="schedule" className="m-0">
+                      {/* Existing Reading List Content */}
+                      {isLoading ? (
+                        <div className="space-y-3">
+                          {[...Array(5)].map((_, i) => (
+                            <Card key={i} className="p-3 bg-[#1c1c1c] border-[#2a2a2a]">
+                              <div className="flex items-center gap-3">
+                                <div className="h-10 w-10 rounded bg-[#2a2a2a] animate-pulse" />
+                                <div className="flex-1">
+                                  <div className="h-4 w-2/3 bg-[#2a2a2a] rounded animate-pulse mb-2" />
+                                  <div className="h-3 w-1/3 bg-[#2a2a2a] rounded animate-pulse" />
                                 </div>
-                                <h3 className="text-[11px] font-medium text-white truncate leading-snug mb-0.5">
-                                  {paper.title}
-                                </h3>
-                                {paper.authors && (
-                                  <p className="text-[10px] text-[#666] truncate">
-                                    {paper.authors.join(", ")}
-                                  </p>
-                                )}
                               </div>
                             </Card>
                           ))}
                         </div>
-                      </motion.div>
-
-                      {/* Upcoming */}
-                      <motion.div variants={itemVariants}>
-                        <div className="flex items-center gap-2 mb-3">
-                          <div className="w-1.5 h-1.5 rounded-full bg-violet-500" />
-                          <h3 className="text-[11px] font-medium text-[#888]">Upcoming</h3>
-                        </div>
-                        <div className="space-y-1">
-                          {upcomingPapers.map((paper) => (
-                            <Card 
-                              key={paper.id}
-                              className="flex items-start gap-2 p-2 hover:bg-[#2a2a2a] transition-colors group border-[#2a2a2a] cursor-pointer"
-                              onClick={() => handlePaperClick(paper)}
-                            >
-                              <div className="flex-shrink-0 w-8 h-8 rounded bg-[#2a2a2a] flex items-center justify-center group-hover:bg-[#333]">
-                                <FileText className="h-4 w-4 text-[#666]" />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-1.5 mb-0.5">
-                                  {paper.scheduled_date && (
-                                    <span className="text-[10px] text-[#666] flex items-center gap-0.5">
-                                      <CalendarIcon className="h-3 w-3" />
-                                      {format(new Date(paper.scheduled_date), "MMM d")}
-                                    </span>
-                                  )}
-                                  {paper.estimated_time && (
-                                    <span className="text-[10px] text-[#666] flex items-center gap-0.5">
-                                      <Clock className="h-3 w-3" />
-                                      {paper.estimated_time} min
-                                    </span>
-                                  )}
+                      ) : (
+                        <motion.div 
+                          className="space-y-6"
+                          variants={containerVariants}
+                          initial="hidden"
+                          animate="visible"
+                        >
+                          {/* Today's Reading */}
+                          <motion.div variants={itemVariants}>
+                            <div className="flex items-center gap-2 mb-3">
+                              <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                              <h3 className="text-[11px] font-medium text-[#888]">Today</h3>
+                            </div>
+                            <div className="space-y-1">
+                              {papersByDate[format(new Date(), "yyyy-MM-dd")]?.map((paper) => (
+                                <Card 
+                                  key={paper.id}
+                                  className="flex items-start gap-2 p-2 hover:bg-[#2a2a2a] transition-colors group border-[#2a2a2a] cursor-pointer"
+                                  onClick={() => handlePaperClick(paper)}
+                                >
+                                  <div className="flex-shrink-0 w-8 h-8 rounded bg-[#2a2a2a] flex items-center justify-center group-hover:bg-[#333]">
+                                    <FileText className="h-4 w-4 text-[#666]" />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-1.5 mb-0.5">
+                                      {paper.estimated_time && (
+                                        <span className="text-[10px] text-[#666] flex items-center gap-0.5">
+                                          <Clock className="h-3 w-3" />
+                                          {paper.estimated_time} min
+                                        </span>
+                                      )}
+                                    </div>
+                                    <h3 className="text-[11px] font-medium text-white truncate leading-snug mb-0.5">
+                                      {paper.title}
+                                    </h3>
+                                    {paper.authors && (
+                                      <p className="text-[10px] text-[#666] truncate">
+                                        {paper.authors.join(", ")}
+                                      </p>
+                                    )}
+                                  </div>
+                                </Card>
+                              ))}
+                              {!papersByDate[format(new Date(), "yyyy-MM-dd")]?.length && (
+                                <div className="text-center py-4 text-sm text-[#666]">
+                                  No papers scheduled for today
                                 </div>
-                                <h3 className="text-[11px] font-medium text-white truncate leading-snug mb-0.5">
-                                  {paper.title}
-                                </h3>
-                                {paper.authors && (
-                                  <p className="text-[10px] text-[#666] truncate">
-                                    {paper.authors.join(", ")}
-                                  </p>
-                                )}
-                              </div>
-                            </Card>
-                          ))}
-                        </div>
-                      </motion.div>
-                    </motion.div>
-                  )}
-                </TabsContent>
-                </Tabs>
-              </ScrollArea>
-            </div>
+                              )}
+                            </div>
+                          </motion.div>
 
-            {/* Activity Sidebar */}
-            <motion.div 
-              className="w-[300px] flex-shrink-0"
-              initial={{ x: 20, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              transition={{ duration: 0.3, delay: 0.2 }}
-            >
-              <Card className="h-full p-4 bg-[#1c1c1c] border-[#2a2a2a]">
-                {activeTab === "schedule" ? (
-                  <>
+                          {/* This Week */}
+                          <motion.div variants={itemVariants}>
+                            <div className="flex items-center gap-2 mb-3">
+                              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                              <h3 className="text-[11px] font-medium text-[#888]">This Week</h3>
+                            </div>
+                            <div className="space-y-1">
+                              {thisWeekPapers.map((paper) => (
+                                <Card 
+                                  key={paper.id}
+                                  className="flex items-start gap-2 p-2 hover:bg-[#2a2a2a] transition-colors group border-[#2a2a2a] cursor-pointer"
+                                  onClick={() => handlePaperClick(paper)}
+                                >
+                                  <div className="flex-shrink-0 w-8 h-8 rounded bg-[#2a2a2a] flex items-center justify-center group-hover:bg-[#333]">
+                                    <FileText className="h-4 w-4 text-[#666]" />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-1.5 mb-0.5">
+                                      {paper.scheduled_date && (
+                                        <span className="text-[10px] text-[#666] flex items-center gap-0.5">
+                                          <CalendarIcon className="h-3 w-3" />
+                                          {format(new Date(paper.scheduled_date), "MMM d")}
+                                        </span>
+                                      )}
+                                      {paper.estimated_time && (
+                                        <span className="text-[10px] text-[#666] flex items-center gap-0.5">
+                                          <Clock className="h-3 w-3" />
+                                          {paper.estimated_time} min
+                                        </span>
+                                      )}
+                                    </div>
+                                    <h3 className="text-[11px] font-medium text-white truncate leading-snug mb-0.5">
+                                      {paper.title}
+                                    </h3>
+                                    {paper.authors && (
+                                      <p className="text-[10px] text-[#666] truncate">
+                                        {paper.authors.join(", ")}
+                                      </p>
+                                    )}
+                                  </div>
+                                </Card>
+                              ))}
+                            </div>
+                          </motion.div>
+
+                          {/* Upcoming */}
+                          <motion.div variants={itemVariants}>
+                            <div className="flex items-center gap-2 mb-3">
+                              <div className="w-1.5 h-1.5 rounded-full bg-violet-500" />
+                              <h3 className="text-[11px] font-medium text-[#888]">Upcoming</h3>
+                            </div>
+                            <div className="space-y-1">
+                              {upcomingPapers.map((paper) => (
+                                <Card 
+                                  key={paper.id}
+                                  className="flex items-start gap-2 p-2 hover:bg-[#2a2a2a] transition-colors group border-[#2a2a2a] cursor-pointer"
+                                  onClick={() => handlePaperClick(paper)}
+                                >
+                                  <div className="flex-shrink-0 w-8 h-8 rounded bg-[#2a2a2a] flex items-center justify-center group-hover:bg-[#333]">
+                                    <FileText className="h-4 w-4 text-[#666]" />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-1.5 mb-0.5">
+                                      {paper.scheduled_date && (
+                                        <span className="text-[10px] text-[#666] flex items-center gap-0.5">
+                                          <CalendarIcon className="h-3 w-3" />
+                                          {format(new Date(paper.scheduled_date), "MMM d")}
+                                        </span>
+                                      )}
+                                      {paper.estimated_time && (
+                                        <span className="text-[10px] text-[#666] flex items-center gap-0.5">
+                                          <Clock className="h-3 w-3" />
+                                          {paper.estimated_time} min
+                                        </span>
+                                      )}
+                                    </div>
+                                    <h3 className="text-[11px] font-medium text-white truncate leading-snug mb-0.5">
+                                      {paper.title}
+                                    </h3>
+                                    {paper.authors && (
+                                      <p className="text-[10px] text-[#666] truncate">
+                                        {paper.authors.join(", ")}
+                                      </p>
+                                    )}
+                                  </div>
+                                </Card>
+                              ))}
+                            </div>
+                          </motion.div>
+                        </motion.div>
+                      )}
+                    </TabsContent>
+                  </Tabs>
+                </ScrollArea>
+              </div>
+
+              {/* Calendar Sidebar - Only show in schedule tab */}
+              {activeTab === "schedule" && (
+                <motion.div 
+                  className="w-[300px] flex-shrink-0"
+                  initial={{ x: 20, opacity: 0 }}
+                  animate={{ x: 0, opacity: 1 }}
+                  transition={{ duration: 0.3, delay: 0.2 }}
+                >
+                  <Card className="h-full p-4 bg-[#1c1c1c] border-[#2a2a2a]">
                     <h3 className="text-sm font-medium text-white mb-4">Schedule</h3>
                     
                     {/* Calendar */}
@@ -495,61 +775,10 @@ export default function ReadingListPage() {
                         </div>
                       </div>
                     </div>
-                  </>
-                ) : (
-                  <>
-                    <h3 className="text-sm font-medium text-white mb-4">Filters</h3>
-                    <div className="space-y-4">
-                      <div>
-                        <h4 className="text-xs font-medium text-[#888] mb-2">Date Range</h4>
-                        <div className="space-y-1">
-                          {["All time", "Last year", "Last 6 months", "Last month"].map((range) => (
-                            <Button
-                              key={range}
-                              variant="ghost"
-                              size="sm"
-                              className="w-full justify-start h-7 text-[11px] hover:bg-[#2a2a2a] text-[#888]"
-                            >
-                              {range}
-                            </Button>
-                          ))}
-                        </div>
-                      </div>
-                      <div>
-                        <h4 className="text-xs font-medium text-[#888] mb-2">Impact</h4>
-                        <div className="space-y-1">
-                          {["Any impact", "High impact", "Rising stars"].map((impact) => (
-                            <Button
-                              key={impact}
-                              variant="ghost"
-                              size="sm"
-                              className="w-full justify-start h-7 text-[11px] hover:bg-[#2a2a2a] text-[#888]"
-                            >
-                              {impact}
-                            </Button>
-                          ))}
-                        </div>
-                      </div>
-                      <div>
-                        <h4 className="text-xs font-medium text-[#888] mb-2">Topics</h4>
-                        <div className="space-y-1">
-                          {["Machine Learning", "Computer Vision", "Natural Language Processing", "Reinforcement Learning"].map((topic) => (
-                            <Button
-                              key={topic}
-                              variant="ghost"
-                              size="sm"
-                              className="w-full justify-start h-7 text-[11px] hover:bg-[#2a2a2a] text-[#888]"
-                            >
-                              {topic}
-                            </Button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                )}
-              </Card>
-            </motion.div>
+                  </Card>
+                </motion.div>
+              )}
+            </div>
           </div>
         </div>
       </div>
