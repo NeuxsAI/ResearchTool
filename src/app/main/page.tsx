@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 
 interface Paper {
   id: string;
@@ -44,6 +45,27 @@ interface Annotation {
   paper_id: string;
   chat_history?: any[];
 }
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.05
+    }
+  }
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.3
+    }
+  }
+};
 
 export default function LibraryPage() {
   const router = useRouter();
@@ -155,14 +177,26 @@ export default function LibraryPage() {
     .slice(MAX_VISIBLE_CATEGORIES);
 
   const handlePaperClick = (paper: Paper) => {
+    // Pre-fetch the paper page for instant navigation
+    router.prefetch(`/paper/${paper.id}`);
     router.push(`/paper/${paper.id}`);
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <motion.div 
+      className="flex flex-col h-full"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3 }}
+    >
       {/* Header */}
       <div className="flex-shrink-0 border-b border-[#2a2a2a] bg-[#1c1c1c]">
-        <div className="p-4">
+        <motion.div 
+          className="p-4"
+          initial={{ y: -20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ duration: 0.3 }}
+        >
           <div className="flex items-center justify-between mb-4">
             <div>
               <h1 className="text-lg font-medium text-white">My Library</h1>
@@ -317,7 +351,7 @@ export default function LibraryPage() {
               <Grid2x2 className="h-3.5 w-3.5 text-[#888]" />
             </Button>
           </div>
-        </div>
+        </motion.div>
       </div>
 
       {/* Main Content */}
@@ -341,13 +375,21 @@ export default function LibraryPage() {
                   ))}
                 </div>
               ) : (
-                <div className="space-y-3">
+                <motion.div 
+                  className="space-y-3"
+                  variants={containerVariants}
+                  initial="hidden"
+                  animate="visible"
+                >
                   {Object.entries(papersByCategory).map(([categoryId, papers]) => {
                     const category = categories.find(c => c.id === categoryId);
                     if (!papers.length) return null;
                     
                     return (
-                      <div key={categoryId}>
+                      <motion.div 
+                        key={categoryId}
+                        variants={itemVariants}
+                      >
                         <div className="flex items-center gap-2 mb-1.5">
                           <div className="flex items-center gap-1.5">
                             <div 
@@ -364,56 +406,66 @@ export default function LibraryPage() {
                         </div>
                         <div className={viewMode === "list" ? "space-y-1" : "grid grid-cols-2 gap-1"}>
                           {papers.map(paper => (
-                            <Card 
-                              key={paper.id} 
-                              className="flex items-start gap-2 p-2 hover:bg-[#2a2a2a] transition-colors group border-[#2a2a2a] cursor-pointer"
-                              onClick={() => handlePaperClick(paper)}
+                            <motion.div
+                              key={paper.id}
+                              whileHover={{ scale: 1.02 }}
+                              whileTap={{ scale: 0.98 }}
                             >
-                              <div className="flex-shrink-0 w-8 h-8 rounded bg-[#2a2a2a] flex items-center justify-center group-hover:bg-[#333]">
-                                <FileText className="h-4 w-4 text-[#666]" />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-1.5 mb-0.5">
-                                  {paper.year && (
-                                    <span className="text-[10px] text-[#666]">
-                                      {paper.year}
-                                    </span>
-                                  )}
-                                  {getReadingStatus(paper.id) && (
-                                    <Badge variant="outline" className="h-3.5 px-1 text-[9px] border-violet-500/30 text-violet-500">
-                                      Reading
-                                    </Badge>
-                                  )}
-                                  {paper.annotations_count && paper.annotations_count > 0 && (
-                                    <span className="text-[9px] text-[#666] flex items-center gap-0.5">
-                                      <MessageSquare className="h-3 w-3" />
-                                      {paper.annotations_count}
-                                    </span>
+                              <Card 
+                                className="flex items-start gap-2 p-2 hover:bg-[#2a2a2a] transition-colors group border-[#2a2a2a] cursor-pointer"
+                                onClick={() => handlePaperClick(paper)}
+                              >
+                                <div className="flex-shrink-0 w-8 h-8 rounded bg-[#2a2a2a] flex items-center justify-center group-hover:bg-[#333]">
+                                  <FileText className="h-4 w-4 text-[#666]" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-1.5 mb-0.5">
+                                    {paper.year && (
+                                      <span className="text-[10px] text-[#666]">
+                                        {paper.year}
+                                      </span>
+                                    )}
+                                    {getReadingStatus(paper.id) && (
+                                      <Badge variant="outline" className="h-3.5 px-1 text-[9px] border-violet-500/30 text-violet-500">
+                                        Reading
+                                      </Badge>
+                                    )}
+                                    {paper.annotations_count && paper.annotations_count > 0 && (
+                                      <span className="text-[9px] text-[#666] flex items-center gap-0.5">
+                                        <MessageSquare className="h-3 w-3" />
+                                        {paper.annotations_count}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <h3 className="text-[11px] font-medium text-white truncate leading-snug mb-0.5">
+                                    {paper.title}
+                                  </h3>
+                                  {paper.authors && (
+                                    <p className="text-[10px] text-[#666] truncate">
+                                      {paper.authors.join(", ")}
+                                    </p>
                                   )}
                                 </div>
-                                <h3 className="text-[11px] font-medium text-white truncate leading-snug mb-0.5">
-                                  {paper.title}
-                                </h3>
-                                {paper.authors && (
-                                  <p className="text-[10px] text-[#666] truncate">
-                                    {paper.authors.join(", ")}
-                                  </p>
-                                )}
-                              </div>
-                            </Card>
+                              </Card>
+                            </motion.div>
                           ))}
                         </div>
-                      </div>
+                      </motion.div>
                     );
                   })}
-                </div>
+                </motion.div>
               )}
             </ScrollArea>
           </div>
 
           {/* Activity Sidebar */}
-          <div className="w-[300px] flex-shrink-0">
-            <Card className="h-full overflow-y-auto p-4 bg-[#1c1c1c] border-[#2a2a2a] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+          <motion.div 
+            className="w-[300px] flex-shrink-0"
+            initial={{ x: 20, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            transition={{ duration: 0.3, delay: 0.2 }}
+          >
+            <Card className="h-full p-4 bg-[#1c1c1c] border-[#2a2a2a] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
               <h3 className="text-sm font-medium text-white mb-4">Recent Activity</h3>
               
               {/* Reading Progress */}
@@ -502,7 +554,7 @@ export default function LibraryPage() {
                 </div>
               </div>
             </Card>
-          </div>
+          </motion.div>
         </div>
       </div>
 
@@ -511,6 +563,6 @@ export default function LibraryPage() {
         open={isAddPaperOpen} 
         onOpenChange={setIsAddPaperOpen} 
       />
-    </div>
+    </motion.div>
   );
 } 
