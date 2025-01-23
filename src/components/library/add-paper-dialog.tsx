@@ -23,6 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { extractTextFromPDF } from "@/lib/pdf/extract-text";
 import { parsePaperContent } from "@/lib/ai/paper-parser";
 import { createClient } from "@/lib/supabase/client";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface AddPaperDialogProps {
   open: boolean;

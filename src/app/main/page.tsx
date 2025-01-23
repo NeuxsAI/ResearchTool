@@ -5,12 +5,13 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileText, Plus, Grid2x2, Search, Clock, BookOpen, Filter, Activity, MessageSquare } from "lucide-react";
+import { FileText, Plus, Grid2x2, Search, Clock, BookOpen, Filter, Activity, MessageSquare, ChevronDown } from "lucide-react";
 import { AddPaperDialog } from "@/components/library/add-paper-dialog";
 import { getPapers, getCategories, getReadingList, getAnnotationsByPaper } from "@/lib/supabase/db";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useRouter } from "next/navigation";
 
 interface Paper {
   id: string;
@@ -45,6 +46,7 @@ interface Annotation {
 }
 
 export default function LibraryPage() {
+  const router = useRouter();
   // State
   const [isAddPaperOpen, setIsAddPaperOpen] = useState(false);
   const [papers, setPapers] = useState<Paper[]>([]);
@@ -57,6 +59,7 @@ export default function LibraryPage() {
   const [sortBy, setSortBy] = useState<"recent" | "title" | "year">("recent");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [showAllCategories, setShowAllCategories] = useState(false);
+  const [showSortOptions, setShowSortOptions] = useState(false);
 
   // Fetch data
   useEffect(() => {
@@ -151,6 +154,10 @@ export default function LibraryPage() {
     .filter(category => papers.filter(p => p.category_id === category.id).length > 0)
     .slice(MAX_VISIBLE_CATEGORIES);
 
+  const handlePaperClick = (paper: Paper) => {
+    router.push(`/paper/${paper.id}`);
+  };
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -173,143 +180,142 @@ export default function LibraryPage() {
           </div>
 
           {/* Search and Filters */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            {/* Search */}
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#666]" />
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#666]" />
               <Input
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search papers..."
-                className="pl-9 h-8 text-[11px] bg-[#2a2a2a] border-[#333] focus:ring-1 focus:ring-violet-500/30"
+                className="pl-8 h-8 text-[11px] bg-[#2a2a2a] border-[#333] focus:ring-1 focus:ring-violet-500/30"
               />
             </div>
-            <div className="flex items-center gap-2">
-              {/* Category Filter */}
-              <div className="relative flex items-center gap-1.5 bg-[#2a2a2a] p-1 rounded border border-[#333]">
+
+            {/* Unified Filters */}
+            <div className="flex items-center h-8 bg-[#1c1c1c] rounded-lg border border-[#2a2a2a]">
+              <div className="flex items-center px-2 gap-1.5">
+                <Filter className="h-3.5 w-3.5 text-[#666]" />
                 <Badge
                   variant={selectedCategories.length === 0 ? "default" : "outline"}
-                  className="h-5 px-2 text-[10px] cursor-pointer hover:bg-[#333] transition-colors whitespace-nowrap"
+                  className={`h-6 px-2.5 text-[11px] cursor-pointer transition-colors whitespace-nowrap ${
+                    selectedCategories.length === 0 
+                      ? "bg-[#2a2a2a] text-white hover:bg-[#333]" 
+                      : "bg-transparent text-[#888] hover:text-white hover:bg-[#2a2a2a]"
+                  }`}
                   onClick={() => setSelectedCategories([])}
                 >
                   All ({papers.length})
                 </Badge>
-                
-                {/* Visible Categories */}
+
                 {visibleCategories.map(category => {
                   const count = papers.filter(p => p.category_id === category.id).length;
                   if (count === 0) return null;
                   
+                  const isSelected = selectedCategories.includes(category.id);
+                  
                   return (
                     <Badge
                       key={category.id}
-                      variant={selectedCategories.includes(category.id) ? "default" : "outline"}
-                      className="h-5 px-2 text-[10px] cursor-pointer hover:bg-[#333] transition-colors whitespace-nowrap group"
+                      variant={isSelected ? "default" : "outline"}
+                      className={`h-6 px-2.5 text-[11px] cursor-pointer transition-all whitespace-nowrap group ${
+                        isSelected 
+                          ? "bg-[#00B2B2] border-[#00B2B2] text-white hover:opacity-90" 
+                          : "bg-transparent border-[#2a2a2a] text-[#888] hover:text-white hover:bg-[#2a2a2a]"
+                      }`}
                       onClick={() => setSelectedCategories(prev => 
                         prev.includes(category.id)
                           ? prev.filter(id => id !== category.id)
                           : [...prev, category.id]
                       )}
-                      style={{
-                        backgroundColor: selectedCategories.includes(category.id) 
-                          ? category.color 
-                          : 'transparent',
-                        borderColor: category.color
-                      }}
                     >
-                      <span className={selectedCategories.includes(category.id) ? "text-white" : `text-[${category.color}]`}>
-                        {category.name}
-                      </span>
-                      <span className={`ml-1.5 text-[9px] ${
-                        selectedCategories.includes(category.id) 
-                          ? "text-white/60" 
-                          : "text-[#666] group-hover:text-[#888]"
-                      }`}>
-                        {count}
-                      </span>
+                      {category.name}
+                      {count > 0 && (
+                        <span className="ml-1 text-[9px] opacity-60">
+                          {count}
+                        </span>
+                      )}
                     </Badge>
                   );
                 })}
+              </div>
 
-                {/* More Categories Button & Dropdown */}
-                {overflowCategories.length > 0 && (
-                  <div className="relative">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-5 px-2 text-[10px] hover:bg-[#333] flex items-center gap-1"
-                      onClick={() => setShowAllCategories(!showAllCategories)}
+              <div className="h-full border-l border-[#2a2a2a] px-2 flex items-center gap-1 relative">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={`h-6 px-2 text-[11px] ${
+                    sortBy === "recent" 
+                      ? "bg-[#2a2a2a] text-white" 
+                      : "text-[#888] hover:text-white hover:bg-[#2a2a2a]"
+                  } transition-colors`}
+                >
+                  {sortBy === "recent" ? "Recent" : sortBy === "title" ? "Title" : "Year"}
+                </Button>
+                <ChevronDown 
+                  className="h-3.5 w-3.5 text-[#666] cursor-pointer hover:text-white transition-colors"
+                  onClick={() => setShowSortOptions(!showSortOptions)}
+                />
+
+                {/* Dropdown for sort options */}
+                {showSortOptions && (
+                  <div 
+                    className="absolute top-full right-0 mt-1 w-32 py-1 bg-[#1c1c1c] rounded-md border border-[#2a2a2a] shadow-lg z-10"
+                    onMouseLeave={() => setShowSortOptions(false)}
+                  >
+                    <button
+                      className={`w-full px-3 py-1.5 text-left text-[11px] ${
+                        sortBy === "recent" 
+                          ? "text-white bg-[#2a2a2a]" 
+                          : "text-[#888] hover:text-white hover:bg-[#2a2a2a]"
+                      } transition-colors`}
+                      onClick={() => {
+                        setSortBy("recent");
+                        setShowSortOptions(false);
+                      }}
                     >
-                      More
-                      <span className="text-[9px] text-[#666]">
-                        ({overflowCategories.length})
-                      </span>
-                    </Button>
-
-                    {/* Dropdown Menu */}
-                    {showAllCategories && (
-                      <div 
-                        className="absolute top-full right-0 mt-1 w-48 py-1 bg-[#2a2a2a] rounded border border-[#333] shadow-lg z-10"
-                        onMouseLeave={() => setShowAllCategories(false)}
-                      >
-                        {overflowCategories.map(category => {
-                          const count = papers.filter(p => p.category_id === category.id).length;
-                          if (count === 0) return null;
-
-                          return (
-                            <button
-                              key={category.id}
-                              className="w-full px-3 py-1.5 text-left hover:bg-[#333] flex items-center justify-between group"
-                              onClick={() => {
-                                setSelectedCategories(prev => 
-                                  prev.includes(category.id)
-                                    ? prev.filter(id => id !== category.id)
-                                    : [...prev, category.id]
-                                );
-                                setShowAllCategories(false);
-                              }}
-                            >
-                              <div className="flex items-center gap-2">
-                                <div 
-                                  className="w-2 h-2 rounded-full"
-                                  style={{ backgroundColor: category.color }}
-                                />
-                                <span className="text-[11px] text-white">
-                                  {category.name}
-                                </span>
-                              </div>
-                              <span className="text-[10px] text-[#666] group-hover:text-[#888]">
-                                {count}
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
+                      Recent
+                    </button>
+                    <button
+                      className={`w-full px-3 py-1.5 text-left text-[11px] ${
+                        sortBy === "title" 
+                          ? "text-white bg-[#2a2a2a]" 
+                          : "text-[#888] hover:text-white hover:bg-[#2a2a2a]"
+                      } transition-colors`}
+                      onClick={() => {
+                        setSortBy("title");
+                        setShowSortOptions(false);
+                      }}
+                    >
+                      Title
+                    </button>
+                    <button
+                      className={`w-full px-3 py-1.5 text-left text-[11px] ${
+                        sortBy === "year" 
+                          ? "text-white bg-[#2a2a2a]" 
+                          : "text-[#888] hover:text-white hover:bg-[#2a2a2a]"
+                      } transition-colors`}
+                      onClick={() => {
+                        setSortBy("year");
+                        setShowSortOptions(false);
+                      }}
+                    >
+                      Year
+                    </button>
                   </div>
                 )}
               </div>
-
-              {/* Sort Options */}
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as "recent" | "title" | "year")}
-                className="h-min px-2 py-1 text-[11px] bg-[#2a2a2a] border-[#333] rounded text-white"
-              >
-                <option value="recent">Recent</option>
-                <option value="title">Title</option>
-                <option value="year">Year</option>
-              </select>
-
-              {/* View Toggle */}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setViewMode(prev => prev === "list" ? "grid" : "list")}
-                className="h-8 px-2 hover:bg-[#333]"
-              >
-                <Grid2x2 className="h-3.5 w-3.5 text-[#888]" />
-              </Button>
             </div>
+
+            {/* View Toggle */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setViewMode(prev => prev === "list" ? "grid" : "list")}
+              className="h-8 w-8 p-0 hover:bg-[#333] flex items-center justify-center"
+            >
+              <Grid2x2 className="h-3.5 w-3.5 text-[#888]" />
+            </Button>
           </div>
         </div>
       </div>
@@ -360,7 +366,8 @@ export default function LibraryPage() {
                           {papers.map(paper => (
                             <Card 
                               key={paper.id} 
-                              className="flex items-start gap-2 p-2 hover:bg-[#2a2a2a] transition-colors group border-[#2a2a2a]"
+                              className="flex items-start gap-2 p-2 hover:bg-[#2a2a2a] transition-colors group border-[#2a2a2a] cursor-pointer"
+                              onClick={() => handlePaperClick(paper)}
                             >
                               <div className="flex-shrink-0 w-8 h-8 rounded bg-[#2a2a2a] flex items-center justify-center group-hover:bg-[#333]">
                                 <FileText className="h-4 w-4 text-[#666]" />
@@ -406,7 +413,7 @@ export default function LibraryPage() {
 
           {/* Activity Sidebar */}
           <div className="w-[300px] flex-shrink-0">
-            <Card className="h-full p-4 bg-[#1c1c1c] border-[#2a2a2a]">
+            <Card className="h-full overflow-y-auto p-4 bg-[#1c1c1c] border-[#2a2a2a] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
               <h3 className="text-sm font-medium text-white mb-4">Recent Activity</h3>
               
               {/* Reading Progress */}
@@ -420,9 +427,13 @@ export default function LibraryPage() {
                     if (!paper) return null;
                     
                     return (
-                      <div key={item.id} className="flex items-center gap-2">
+                      <div 
+                        key={item.id} 
+                        className="flex items-center gap-2 hover:bg-[#2a2a2a] p-1.5 rounded cursor-pointer transition-colors group"
+                        onClick={() => handlePaperClick(paper)}
+                      >
                         <BookOpen className="h-3.5 w-3.5 text-violet-500" />
-                        <span className="text-[11px] text-white truncate">
+                        <span className="text-[11px] text-[#888] group-hover:text-white truncate">
                           {paper.title}
                         </span>
                       </div>
@@ -439,16 +450,19 @@ export default function LibraryPage() {
                 <div className="space-y-2">
                   {recentAnnotations.map(annotation => {
                     const paper = papers.find(p => p.id === annotation.paper_id);
+                    if (!paper) return null;
                     return (
-                      <div key={annotation.id} className="space-y-1">
-                        <p className="text-[11px] text-[#aaa] line-clamp-2">
+                      <div 
+                        key={annotation.id} 
+                        className="space-y-1 hover:bg-[#2a2a2a] p-1.5 rounded cursor-pointer transition-colors group"
+                        onClick={() => handlePaperClick(paper)}
+                      >
+                        <p className="text-[11px] text-[#aaa] group-hover:text-white line-clamp-2">
                           {annotation.content}
                         </p>
-                        {paper && (
-                          <p className="text-[10px] text-[#666]">
-                            on {paper.title}
-                          </p>
-                        )}
+                        <p className="text-[10px] text-[#666] group-hover:text-[#888]">
+                          on {paper.title}
+                        </p>
                       </div>
                     );
                   })}
@@ -466,14 +480,19 @@ export default function LibraryPage() {
                     .slice(0, 3)
                     .map(annotation => {
                       const paper = papers.find(p => p.id === annotation.paper_id);
+                      if (!paper) return null;
                       return (
-                        <div key={annotation.id} className="flex items-center gap-2">
+                        <div 
+                          key={annotation.id} 
+                          className="flex items-center gap-2 hover:bg-[#2a2a2a] p-1.5 rounded cursor-pointer transition-colors group"
+                          onClick={() => handlePaperClick(paper)}
+                        >
                           <Activity className="h-3.5 w-3.5 text-emerald-500" />
                           <div className="flex-1 min-w-0">
-                            <p className="text-[11px] text-white truncate">
-                              {paper?.title}
+                            <p className="text-[11px] text-[#888] group-hover:text-white truncate">
+                              {paper.title}
                             </p>
-                            <p className="text-[10px] text-[#666]">
+                            <p className="text-[10px] text-[#666] group-hover:text-[#888]">
                               {annotation.chat_history?.length} messages
                             </p>
                           </div>
