@@ -38,19 +38,20 @@ import { MainLayout } from "@/components/layout/main-layout";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { PaperCard, PaperCardSkeleton } from "@/components/paper-card";
+import { Paper } from "@/components/paper-card";
 
-interface Paper {
+// Interface for Supabase data
+interface SupabasePaper {
   id: string;
   title?: string;
+  abstract?: string;
   authors?: string[];
   year?: number;
-  category_id?: string;
+  institution?: string;
+  url?: string;
   scheduled_date?: string;
   estimated_time?: number;
-  abstract?: string;
-  citations?: number;
-  institution?: string;
-  impact?: string;
 }
 
 interface ReadingListItem {
@@ -110,6 +111,7 @@ export default function ReadingListPage() {
   const [hasSearched, setHasSearched] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<Paper[]>([]);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
   const exampleQueries = [
     { text: "Attention mechanisms", icon: Sparkles },
@@ -119,41 +121,67 @@ export default function ReadingListPage() {
 
   const handleExampleQuery = (query: string) => {
     setSearchQuery(query);
-    handleSearch(null, query);
+    handleSearch(query);
   };
 
-  const handleSearch = async (e: React.FormEvent | null, exampleQuery?: string) => {
-    if (e) e.preventDefault();
-    const query = exampleQuery || searchQuery;
+  async function handleSearch(searchQuery: string) {
+    if (!searchQuery.trim()) return;
     
-    if (query.trim()) {
-      setIsSearching(true);
-      setHasSearched(true);
-      
-      try {
-        // TODO: Replace with actual API call
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        setSearchResults([
-          // Mock results for now
-          {
-            id: "1",
-            title: "Attention Is All You Need",
-            abstract: "We propose a new simple network architecture, the Transformer, based solely on attention mechanisms...",
-            citations: 52000,
-            year: 2017,
-            institution: "Google Research",
-            impact: "high"
-          },
-          // Add more mock results...
-        ]);
-      } catch (error) {
-        console.error("Search error:", error);
-        // TODO: Add error handling
-      } finally {
-        setIsSearching(false);
+    setIsSearching(true);
+    setSearchError(null);
+    setSearchResults([]); // Clear previous results
+    
+    try {
+      const response = await fetch('/api/papers/search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: searchQuery,
+          dateRange: selectedDateRange,
+          impact: selectedImpact,
+          topics: selectedTopics,
+          page: 1,
+          limit: 10
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to search papers');
       }
+
+      const data = await response.json();
+      console.log('Search results:', data);
+      
+      // Check if data.papers exists and is an array
+      const papersArray = Array.isArray(data.papers) ? data.papers : [];
+      
+      // Map the API response to match the Paper interface
+      const mappedPapers: Paper[] = papersArray.map((paper: any) => ({
+        id: paper.id,
+        title: paper.title,
+        abstract: paper.abstract,
+        authors: paper.authors,
+        year: paper.year,
+        citations: paper.citations || 0,
+        institution: paper.institution,
+        impact: paper.impact || "low",
+        url: paper.url,
+        topics: paper.topics || [],
+      }));
+      
+      setSearchResults(mappedPapers);
+      setHasSearched(true);
+      setIsSearching(false);
+      
+    } catch (error) {
+      console.error('Search error:', error);
+      setSearchError(error instanceof Error ? error.message : 'Failed to search papers');
+      setHasSearched(true);
+      setIsSearching(false);
     }
-  };
+  }
 
   useEffect(() => {
     async function loadData() {
@@ -164,7 +192,31 @@ export default function ReadingListPage() {
           getReadingList()
         ]);
 
-        setPapers(papersResult.data || []);
+        // First map to base Paper interface
+        const basePapers: Paper[] = (papersResult.data || [])
+          .filter((paper: SupabasePaper) => 
+            Boolean(paper.id && paper.title && paper.authors)
+          )
+          .map(paper => ({
+            id: paper.id!,
+            title: paper.title!,
+            abstract: paper.abstract,
+            authors: paper.authors!,
+            year: paper.year || new Date().getFullYear(),
+            citations: 0,
+            impact: "low" as const,
+            url: paper.url || `https://example.com/paper/${paper.id}`,
+            topics: []
+          }));
+
+        // Then extend with reading list properties
+        const readingListPapers: Paper[] = basePapers.map(paper => ({
+          ...paper,
+          scheduled_date: undefined,
+          estimated_time: undefined
+        }));
+
+        setPapers(readingListPapers);
         setReadingList(readingListResult.data || []);
       } catch (error) {
         console.error("Error loading data:", error);
@@ -247,8 +299,11 @@ export default function ReadingListPage() {
 
             {activeTab === "discover" && (
               <div className="space-y-3">
-                <form onSubmit={handleSearch} className="relative">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#666]" />
+                <form onSubmit={(e) => { e.preventDefault(); handleSearch(searchQuery); }} className="relative">
+                  <Search className={cn(
+                    "absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5",
+                    isSearching ? "text-blue-500 animate-pulse" : "text-[#666]"
+                  )} />
                   <Input
                     value={searchQuery}
                     onChange={(e) => {
@@ -257,6 +312,7 @@ export default function ReadingListPage() {
                     }}
                     placeholder="Search for papers, authors, or topics..."
                     className="pl-8 h-8 text-[11px] bg-[#2a2a2a] border-[#333] focus:ring-1 focus:ring-violet-500/30"
+                    disabled={isSearching}
                   />
                 </form>
                 <div className="flex items-center gap-2">
@@ -461,97 +517,54 @@ export default function ReadingListPage() {
                           </div>
                         </div>
                       ) : (
-                        <motion.div 
-                          className="space-y-2"
-                          variants={containerVariants}
-                          initial="hidden"
-                          animate="visible"
-                        >
+                        <div className="mt-6">
                           {isSearching ? (
-                            [...Array(3)].map((_, i) => (
-                              <motion.div 
-                                key={i}
-                                variants={loadingVariants}
-                                animate="animate"
-                                className="p-3 border border-[#2a2a2a] rounded-xl"
-                              >
-                                <div className="flex items-start gap-3">
-                                  <div className="flex-shrink-0 w-10 h-10 rounded bg-[#2a2a2a]" />
-                                  <div className="flex-1 min-w-0 space-y-2">
-                                    <div className="h-5 bg-[#2a2a2a] rounded w-2/3" />
-                                    <div className="h-4 bg-[#2a2a2a] rounded w-full" />
-                                    <div className="h-4 bg-[#2a2a2a] rounded w-1/2" />
-                                  </div>
-                                </div>
-                              </motion.div>
-                            ))
-                          ) : searchResults.length > 0 ? (
-                            searchResults.map((paper, i) => (
-                              <motion.div 
-                                key={paper.id} 
-                                variants={itemVariants}
-                                whileHover={{ scale: 1.01 }}
-                                whileTap={{ scale: 0.99 }}
-                              >
-                                <Card className="p-3 hover:bg-[#2a2a2a] transition-colors cursor-pointer border-[#2a2a2a]">
-                                  <div className="flex items-start gap-3">
-                                    <div className="flex-shrink-0 w-10 h-10 rounded bg-[#2a2a2a] flex items-center justify-center">
-                                      <FileText className="h-5 w-5 text-[#666]" />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-center gap-2 mb-1">
-                                        <h3 className="text-sm font-medium text-white truncate">
-                                          {paper.title}
-                                        </h3>
-                                        <Badge className="bg-violet-500/10 text-violet-500 hover:bg-violet-500/20">
-                                          {paper.impact === "high" ? "High Impact" : "Low Impact"}
-                                        </Badge>
-                                      </div>
-                                      <p className="text-xs text-[#888] mb-2 line-clamp-2">
-                                        {paper.abstract}
-                                      </p>
-                                      <div className="flex items-center gap-3 text-[11px] text-[#666]">
-                                        <span className="flex items-center gap-1">
-                                          <Star className="h-3 w-3" />
-                                          {paper.citations} citations
-                                        </span>
-                                        <span>{paper.year}</span>
-                                        <span>{paper.institution}</span>
-                                      </div>
-                                    </div>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-7 px-2.5 text-[11px] hover:bg-[#333] text-white bg-[#2a2a2a]"
-                                    >
-                                      <BookMarked className="h-3.5 w-3.5 mr-1.5" />
-                                      Add to list
-                                    </Button>
-                                  </div>
-                                </Card>
-                              </motion.div>
-                            ))
+                            <motion.div 
+                              className="space-y-4"
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              transition={{ duration: 0.2 }}
+                            >
+                              <PaperCardSkeleton />
+                              <PaperCardSkeleton />
+                              <PaperCardSkeleton />
+                            </motion.div>
+                          ) : searchError ? (
+                            <motion.div 
+                              className="text-red-500 text-center py-4"
+                              initial={{ opacity: 0, y: 20 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ duration: 0.3 }}
+                            >
+                              {searchError}
+                            </motion.div>
+                          ) : searchResults.length === 0 ? (
+                            <motion.div 
+                              className="text-center py-4 text-muted-foreground"
+                              initial={{ opacity: 0, y: 20 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ duration: 0.3 }}
+                            >
+                              No papers found matching your search.
+                            </motion.div>
                           ) : (
                             <motion.div 
-                              variants={itemVariants}
-                              className="h-[calc(100vh-16rem)] flex flex-col items-center justify-center text-center"
+                              className="space-y-4"
+                              variants={containerVariants}
+                              initial="hidden"
+                              animate="visible"
                             >
-                              <div className="w-full max-w-md space-y-4">
-                                <div className="flex justify-center">
-                                  <div className="w-12 h-12 rounded-full bg-[#2a2a2a] flex items-center justify-center">
-                                    <FileText className="h-6 w-6 text-[#666]" />
-                                  </div>
-                                </div>
-                                <div>
-                                  <h3 className="text-lg font-medium text-white mb-2">No papers found</h3>
-                                  <p className="text-sm text-[#888]">
-                                    Try adjusting your search terms or filters
-                                  </p>
-                                </div>
-                              </div>
+                              {searchResults.map((paper) => (
+                                <motion.div key={paper.id} variants={itemVariants}>
+                                  <PaperCard
+                                    paper={paper}
+                                    onAddToList={() => {/* TODO: Implement add to list */}}
+                                  />
+                                </motion.div>
+                              ))}
                             </motion.div>
                           )}
-                        </motion.div>
+                        </div>
                       )}
                     </TabsContent>
 
