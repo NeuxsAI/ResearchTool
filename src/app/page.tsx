@@ -19,19 +19,19 @@ export default function LandingPage() {
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 1, delay: 0.2 }}
-          className="absolute -top-40 -right-40 w-[500px] h-[500px] bg-[#4B0082]/30 rounded-full blur-[120px]" 
+          className="absolute -top-40 -right-40 w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-[120px]" 
         />
         <motion.div 
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 1, delay: 0.4 }}
-          className="absolute top-20 -left-40 w-[500px] h-[500px] bg-[#FF0000]/20 rounded-full blur-[120px]" 
+          className="absolute top-20 -left-40 w-[500px] h-[500px] bg-blue-500/5 rounded-full blur-[120px]" 
         />
         <motion.div 
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 1, delay: 0.6 }}
-          className="absolute bottom-0 left-1/2 w-[500px] h-[500px] bg-[#0000FF]/20 rounded-full blur-[120px]" 
+          className="absolute bottom-0 left-1/2 w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-[120px]" 
         />
       </div>
       <div className="relative flex flex-col flex-grow">

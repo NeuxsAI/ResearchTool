@@ -6,6 +6,14 @@ import { motion } from "framer-motion"
 import { useState } from "react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
+import { Sparkles, ArrowRight, CheckCircle2 } from "lucide-react"
+
+const benefits = [
+  "Early access to AI-powered research tools",
+  "Priority feature requests and feedback",
+  "Exclusive beta testing opportunities",
+  "Direct access to the development team"
+]
 
 export function EarlyAccess() {
   const [email, setEmail] = useState("")
@@ -39,48 +47,98 @@ export function EarlyAccess() {
   }
 
   return (
-    <section id="early-access" className="py-32 relative">
+    <section className="py-32 relative">
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 1 }}
-          className="absolute top-1/2 -translate-y-1/2 left-1/4 w-[500px] h-[500px] bg-[#4B0082]/30 rounded-full blur-[120px]"
+          className="absolute top-1/2 -translate-y-1/2 left-1/4 w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-[120px]"
         />
       </div>
-      <div className="container relative">
+      <div className="container px-4 sm:px-6 lg:px-8 relative">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="max-w-2xl mx-auto text-center"
+          className="max-w-4xl mx-auto"
         >
-          <h2 className="text-3xl font-bold tracking-tight text-white mb-4">
-            Get Early{" "}
-            <span className="bg-gradient-to-r from-purple-500 via-blue-500 to-indigo-500 text-transparent bg-clip-text">
-              Access
-            </span>
-          </h2>
-          <p className="text-lg text-[#888] mb-8">
-            Join our waitlist to be among the first to experience the future of research management.
-          </p>
-          <form onSubmit={handleSubmit} className="flex gap-4 max-w-md mx-auto">
-            <Input
-              type="email"
-              placeholder="Enter your email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="bg-[#0A0A0A]/50 border-[#ffffff10] text-white placeholder:text-[#888]"
-            />
-            <Button 
-              type="submit" 
-              disabled={isLoading}
-              className="bg-gradient-to-r from-purple-500 to-blue-500 text-white hover:opacity-90 whitespace-nowrap"
-            >
-              {isLoading ? "Joining..." : "Join Waitlist"}
-            </Button>
-          </form>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="relative p-8 rounded-2xl overflow-hidden"
+            style={{
+              background: "linear-gradient(to bottom right, rgba(30, 30, 30, 0.8), rgba(20, 20, 20, 0.8))",
+              backdropFilter: "blur(12px)",
+              border: "1px solid rgba(51, 51, 51, 0.5)"
+            }}
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent" />
+            
+            <div className="relative">
+              <div className="text-center mb-8">
+                <h2 className="text-3xl font-bold tracking-tight text-white mb-4">
+                  Get Early{" "}
+                  <span className="relative">
+                    <span className="text-blue-500">
+                      Access
+                    </span>
+                    <motion.span
+                      initial={{ width: "0%" }}
+                      animate={{ width: "100%" }}
+                      transition={{ duration: 1, delay: 0.5 }}
+                      className="absolute bottom-0 left-0 h-[2px] bg-blue-500/50 blur-sm"
+                    />
+                    <motion.span
+                      initial={{ width: "0%" }}
+                      animate={{ width: "100%" }}
+                      transition={{ duration: 1, delay: 0.5 }}
+                      className="absolute bottom-0 left-0 h-px bg-blue-500"
+                    />
+                  </span>
+                </h2>
+                <p className="text-lg text-[#888] mb-8">
+                  Join our waitlist to be among the first to experience the future of research management.
+                </p>
+              </div>
+
+              <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-4 max-w-md mx-auto mb-12">
+                <Input
+                  type="email"
+                  placeholder="Enter your email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="h-12 bg-[#0A0A0A]/50 border-[#333] text-white placeholder:text-[#666] focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/30"
+                />
+                <Button 
+                  type="submit" 
+                  disabled={isLoading}
+                  className="h-12 bg-[#2a2a2a] hover:bg-[#333] text-white whitespace-nowrap px-8"
+                >
+                  {isLoading ? "Joining..." : "Join Waitlist"}
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </form>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {benefits.map((benefit, index) => (
+                  <motion.div
+                    key={benefit}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.5, delay: 0.4 + index * 0.1 }}
+                    className="flex items-center gap-2"
+                  >
+                    <CheckCircle2 className="h-5 w-5 text-blue-500 flex-shrink-0" />
+                    <span className="text-sm text-[#888]">{benefit}</span>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          </motion.div>
         </motion.div>
       </div>
     </section>
