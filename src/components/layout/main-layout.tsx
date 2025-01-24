@@ -30,19 +30,6 @@ interface MainLayoutProps {
   children: React.ReactNode;
 }
 
-const gradients = [
-  'from-blue-500 to-purple-500',
-  'from-green-500 to-blue-500',
-  'from-yellow-500 to-red-500',
-  'from-pink-500 to-purple-500',
-  'from-indigo-500 to-blue-500',
-  'from-red-500 to-pink-500',
-  'from-purple-500 to-indigo-500',
-  'from-orange-500 to-red-500',
-  'from-teal-500 to-green-500',
-  'from-cyan-500 to-blue-500',
-];
-
 export function MainLayout({ children }: MainLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -159,7 +146,10 @@ export function MainLayout({ children }: MainLayoutProps) {
                     onClick={() => handleNavigation(routes.category.view(category.id))}
                   >
                     <div className="flex items-center">
-                      <div className={`w-1.5 h-1.5 rounded-full bg-gradient-to-br ${gradients[index % gradients.length]} mr-2`} />
+                      <div 
+                        className="w-1.5 h-1.5 rounded-full mr-2" 
+                        style={{ backgroundColor: category.color || '#666' }}
+                      />
                       <span>{category.name}</span>
                     </div>
                   </Button>

@@ -70,10 +70,13 @@ export async function getPapersByCategory(categoryId: string): Promise<DbArrayRe
   
   return await supabase
     .from('papers')
-    .select('*')
+    .select(`
+      *,
+      annotations:annotations(count)
+    `)
     .eq('category_id', categoryId)
     .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
+    .order('created_at', { ascending: false });
 }
 
 export async function getPaperById(id: string): Promise<DbResult<Paper>> {

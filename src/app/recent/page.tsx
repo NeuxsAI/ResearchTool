@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, MessageSquare, Pencil, LayoutGrid, List } from "lucide-react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { AddPaperDialog } from "@/components/library/add-paper-dialog";
-import { getPapers } from "@/lib/supabase/db";
+import { getPapers, getCategories } from "@/lib/supabase/db";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -19,6 +19,7 @@ interface Paper {
   year?: number;
   category?: string;
   category_id?: string;
+  category_color?: string;
   annotations_count?: number;
   url?: string;
   created_at?: string;
@@ -57,12 +58,21 @@ export default function RecentPage() {
     async function loadPapers() {
       try {
         setIsLoading(true);
-        const { data, error } = await getPapers();
+        const { data: papers, error } = await getPapers();
+        const { data: categories } = await getCategories();
         
         if (error) throw error;
         
         // Sort by most recently updated/created and take the last 10
-        const sortedPapers = (data || [])
+        const sortedPapers = (papers || [])
+          .map(paper => {
+            const category = categories?.find(c => c.id === paper.category_id);
+            return {
+              ...paper,
+              category: category?.name,
+              category_color: category?.color
+            };
+          })
           .sort((a, b) => {
             const aDate = new Date(a.updated_at || a.created_at || "").getTime();
             const bDate = new Date(b.updated_at || b.created_at || "").getTime();
@@ -193,7 +203,15 @@ export default function RecentPage() {
                         >
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5 text-[11px] text-[#666] mb-1">
-                              <span>{paper.category}</span>
+                              {paper.category && (
+                                <span className="flex items-center gap-1.5">
+                                  <div 
+                                    className="w-1.5 h-1.5 rounded-full" 
+                                    style={{ backgroundColor: paper.category_color || '#666' }}
+                                  />
+                                  {paper.category}
+                                </span>
+                              )}
                               <span>•</span>
                               <span>{paper.year}</span>
                             </div>
@@ -282,7 +300,15 @@ export default function RecentPage() {
                           <div className="flex items-start gap-3">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-1.5 text-[11px] text-[#666] mb-1">
-                                <span>{paper.category}</span>
+                                {paper.category && (
+                                  <span className="flex items-center gap-1.5">
+                                    <div 
+                                      className="w-1.5 h-1.5 rounded-full" 
+                                      style={{ backgroundColor: paper.category_color || '#666' }}
+                                    />
+                                    {paper.category}
+                                  </span>
+                                )}
                                 <span>•</span>
                                 <span>{paper.year}</span>
                               </div>

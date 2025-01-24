@@ -8,7 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { getReadingList, getPapers } from "@/lib/supabase/db";
+import { getReadingList, getPapers, getCategories } from "@/lib/supabase/db";
 import { 
   FileText, 
   Calendar as CalendarIcon, 
@@ -52,6 +52,7 @@ interface SupabasePaper {
   url?: string;
   scheduled_date?: string;
   estimated_time?: number;
+  category_id?: string;
 }
 
 interface ReadingListItem {
@@ -187,9 +188,10 @@ export default function ReadingListPage() {
     async function loadData() {
       try {
         setIsLoading(true);
-        const [papersResult, readingListResult] = await Promise.all([
+        const [papersResult, readingListResult, categoriesResult] = await Promise.all([
           getPapers(),
-          getReadingList()
+          getReadingList(),
+          getCategories()
         ]);
 
         // First map to base Paper interface
@@ -197,17 +199,26 @@ export default function ReadingListPage() {
           .filter((paper: SupabasePaper) => 
             Boolean(paper.id && paper.title && paper.authors)
           )
-          .map(paper => ({
-            id: paper.id!,
-            title: paper.title!,
-            abstract: paper.abstract,
-            authors: paper.authors!,
-            year: paper.year || new Date().getFullYear(),
-            citations: 0,
-            impact: "low" as const,
-            url: paper.url || `https://example.com/paper/${paper.id}`,
-            topics: []
-          }));
+          .map(paper => {
+            const category = categoriesResult.data?.find(c => c.id === paper.category_id);
+            return {
+              id: paper.id!,
+              title: paper.title!,
+              abstract: paper.abstract,
+              authors: paper.authors!,
+              year: paper.year || new Date().getFullYear(),
+              citations: 0,
+              impact: "low" as const,
+              url: paper.url || `https://example.com/paper/${paper.id}`,
+              topics: [],
+              category_id: paper.category_id,
+              category: category ? {
+                id: category.id,
+                name: category.name,
+                color: category.color
+              } : undefined
+            };
+          });
 
         // Then extend with reading list properties
         const readingListPapers: Paper[] = basePapers.map(paper => ({

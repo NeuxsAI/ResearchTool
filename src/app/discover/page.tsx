@@ -15,6 +15,7 @@ export default function DiscoverPage() {
       authors: ["Anthropic Research Team"],
       year: "2023",
       category: "AI Ethics",
+      category_color: "#9333ea", // Purple for ethics
       citations: 156,
       trending: true,
     },
@@ -24,6 +25,7 @@ export default function DiscoverPage() {
       authors: ["Google Research Team"],
       year: "2023",
       category: "Machine Learning",
+      category_color: "#3b82f6", // Blue for ML
       citations: 245,
       trending: true,
     },
@@ -70,7 +72,13 @@ export default function DiscoverPage() {
                   <Card key={paper.id} className="p-3 bg-[#2a2a2a] border-[#333] hover:bg-[#333] transition-colors">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 text-[11px] text-[#666] mb-1">
-                        <span>{paper.category}</span>
+                        <span className="flex items-center gap-1.5">
+                          <div 
+                            className="w-1.5 h-1.5 rounded-full" 
+                            style={{ backgroundColor: paper.category_color }}
+                          />
+                          {paper.category}
+                        </span>
                         <span>•</span>
                         <span>{paper.year}</span>
                         {paper.trending && (
@@ -105,7 +113,13 @@ export default function DiscoverPage() {
                   <Card key={paper.id} className="p-3 bg-[#2a2a2a] border-[#333] hover:bg-[#333] transition-colors">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 text-[11px] text-[#666] mb-1">
-                        <span>{paper.category}</span>
+                        <span className="flex items-center gap-1.5">
+                          <div 
+                            className="w-1.5 h-1.5 rounded-full" 
+                            style={{ backgroundColor: paper.category_color }}
+                          />
+                          {paper.category}
+                        </span>
                         <span>•</span>
                         <span>{paper.year}</span>
                         <span>•</span>

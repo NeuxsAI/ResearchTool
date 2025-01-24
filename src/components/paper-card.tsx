@@ -18,6 +18,12 @@ export interface Paper {
   topics: string[];
   scheduled_date?: string;
   estimated_time?: number;
+  category_id?: string;
+  category?: {
+    id: string;
+    name: string;
+    color?: string;
+  };
 }
 
 interface PaperCardProps {
@@ -43,6 +49,15 @@ export function PaperCard({ paper, onAddToList }: PaperCardProps) {
                   {paper.title}
                 </h3>
                 <div className="flex items-center gap-3 text-[11px] text-[#666]">
+                  {paper.category && (
+                    <span className="flex items-center gap-1.5">
+                      <div 
+                        className="w-1.5 h-1.5 rounded-full" 
+                        style={{ backgroundColor: paper.category.color || '#666' }}
+                      />
+                      {paper.category.name}
+                    </span>
+                  )}
                   <span className="flex items-center gap-1">
                     <Star className="h-3 w-3" />
                     {paper.citations} citations
