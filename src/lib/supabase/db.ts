@@ -53,26 +53,52 @@ export async function deleteCategory(id: string): Promise<DbResult<Category>> {
 // Papers
 export const getPapers = async (): Promise<DbArrayResult<Paper>> => {
   const supabase = createBrowserClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { data: [], error: null }
+  
   return await supabase
     .from('papers')
     .select('*')
+    .eq('user_id', user.id)
     .order('created_at', { ascending: false })
 }
 
 export async function getPapersByCategory(categoryId: string): Promise<DbArrayResult<Paper>> {
   const supabase = createBrowserClient()
-  return await supabase.from('papers').select('*').eq('category_id', categoryId).order('created_at', { ascending: false })
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { data: [], error: null }
+  
+  return await supabase
+    .from('papers')
+    .select('*')
+    .eq('category_id', categoryId)
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false })
 }
 
 export async function getPaperById(id: string): Promise<DbResult<Paper>> {
   const supabase = createBrowserClient()
-  return await supabase.from('papers').select('*').eq('id', id).single()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { data: null, error: new Error('Not authenticated') }
+  
+  return await supabase
+    .from('papers')
+    .select('*')
+    .eq('id', id)
+    .eq('user_id', user.id)
+    .single()
 }
 
 // Server-side operations that need token
 export async function createPaper(paper: Partial<Paper>, token?: string): Promise<DbResult<Paper>> {
-  const supabase = createServerClient(token)
-  return await supabase.from('papers').insert(paper).select().single()
+  const supabase = token ? createServerClient(token) : createServerClient();
+  
+  // Create the paper with the provided user_id
+  return await supabase
+    .from('papers')
+    .insert(paper)  // paper already contains user_id from the route handler
+    .select()
+    .single();
 }
 
 export async function updatePaper(
@@ -100,7 +126,19 @@ export async function deletePaper(id: string, token?: string): Promise<DbResult<
 // Annotations
 export async function getAnnotationsByPaper(paperId: string): Promise<DbArrayResult<Annotation>> {
   const supabase = createBrowserClient()
-  return await supabase.from('annotations').select('*').eq('paper_id', paperId).order('created_at')
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { data: [], error: null }
+  
+  console.log("Fetching annotations for paper:", paperId);
+  const result = await supabase
+    .from('annotations')
+    .select('*')
+    .eq('paper_id', paperId)
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false });
+  
+  console.log("Annotations result:", result);
+  return result;
 }
 
 export async function createAnnotation(annotation: Partial<Annotation>): Promise<DbResult<Annotation>> {
@@ -135,65 +173,145 @@ export async function deleteAnnotation(id: string): Promise<DbResult<Annotation>
 // Boards
 export const getBoards = async (): Promise<DbArrayResult<Board>> => {
   const supabase = createBrowserClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { data: [], error: null }
+  
   return await supabase
     .from('boards')
     .select('*')
+    .eq('user_id', user.id)
     .order('created_at', { ascending: false })
 }
 
 export async function getBoardById(id: string): Promise<DbResult<Board>> {
   const supabase = createBrowserClient()
-  return await supabase.from('boards').select('*').eq('id', id).single()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { data: null, error: new Error('Not authenticated') }
+  
+  return await supabase
+    .from('boards')
+    .select('*')
+    .eq('id', id)
+    .eq('user_id', user.id)
+    .single()
 }
 
 export async function createBoard(board: Partial<Board>): Promise<DbResult<Board>> {
   const supabase = createBrowserClient()
-  return await supabase.from('boards').insert(board).select().single()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('User not authenticated')
+  
+  return await supabase
+    .from('boards')
+    .insert({ ...board, user_id: user.id })
+    .select()
+    .single()
 }
 
 export async function updateBoard(id: string, board: Partial<Board>): Promise<DbResult<Board>> {
   const supabase = createBrowserClient()
-  return await supabase.from('boards').update(board).eq('id', id).select().single()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('User not authenticated')
+  
+  return await supabase
+    .from('boards')
+    .update(board)
+    .eq('id', id)
+    .eq('user_id', user.id)
+    .select()
+    .single()
 }
 
 export async function deleteBoard(id: string): Promise<DbResult<Board>> {
   const supabase = createBrowserClient()
-  return await supabase.from('boards').delete().eq('id', id).select().single()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('User not authenticated')
+  
+  return await supabase
+    .from('boards')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', user.id)
+    .select()
+    .single()
 }
 
 // Board Items
 export async function getBoardItems(boardId: string): Promise<DbArrayResult<BoardItem>> {
   const supabase = createBrowserClient()
-  return await supabase.from('board_items').select('*').eq('board_id', boardId)
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { data: [], error: null }
+  
+  return await supabase
+    .from('board_items')
+    .select('*')
+    .eq('board_id', boardId)
+    .eq('user_id', user.id)
 }
 
 export async function createBoardItem(item: Partial<BoardItem>): Promise<DbResult<BoardItem>> {
   const supabase = createBrowserClient()
-  return await supabase.from('board_items').insert(item).select().single()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('User not authenticated')
+  
+  return await supabase
+    .from('board_items')
+    .insert({ ...item, user_id: user.id })
+    .select()
+    .single()
 }
 
 export async function updateBoardItem(id: string, item: Partial<BoardItem>): Promise<DbResult<BoardItem>> {
   const supabase = createBrowserClient()
-  return await supabase.from('board_items').update(item).eq('id', id).select().single()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('User not authenticated')
+  
+  return await supabase
+    .from('board_items')
+    .update(item)
+    .eq('id', id)
+    .eq('user_id', user.id)
+    .select()
+    .single()
 }
 
 export async function deleteBoardItem(id: string): Promise<DbResult<BoardItem>> {
   const supabase = createBrowserClient()
-  return await supabase.from('board_items').delete().eq('id', id).select().single()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('User not authenticated')
+  
+  return await supabase
+    .from('board_items')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', user.id)
+    .select()
+    .single()
 }
 
 // Reading List
 export const getReadingList = async (): Promise<DbArrayResult<ReadingListItem>> => {
   const supabase = createBrowserClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { data: [], error: null }
+  
   return await supabase
     .from('reading_list')
     .select('*')
+    .eq('user_id', user.id)
     .order('added_at', { ascending: false })
 }
 
 export async function addToReadingList(paperId: string): Promise<DbResult<ReadingListItem>> {
   const supabase = createBrowserClient()
-  return await supabase.from('reading_list').insert({ paper_id: paperId }).select().single()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('User not authenticated')
+  
+  return await supabase
+    .from('reading_list')
+    .insert({ paper_id: paperId, user_id: user.id })
+    .select()
+    .single()
 }
 
 export async function removeFromReadingList(id: string): Promise<DbResult<ReadingListItem>> {

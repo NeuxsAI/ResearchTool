@@ -382,8 +382,6 @@ export default function PaperPage() {
         <div className="flex items-center justify-between p-4 border-b border-[#2a2a2a]">
           <div className="flex items-center gap-2">
             <h1 className="text-[#eee] text-sm font-medium">{paper.title}</h1>
-            <span className="text-[#666] text-sm">•</span>
-            <span className="text-[#666] text-sm">{paper.year}</span>
           </div>
           <div className="flex items-center gap-2">
             <Button 

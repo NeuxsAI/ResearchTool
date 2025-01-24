@@ -17,7 +17,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Get the token
+    // Get the token and validate user
     const token = authHeader.split(' ')[1];
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     
@@ -78,18 +78,6 @@ export async function POST(request: Request) {
       );
     }
 
-    console.log('Parsed form data:', {
-      title,
-      authors,
-      year,
-      abstract,
-      categoryId,
-      hasFile: !!file,
-      fileName: file?.name,
-      fileSize: file?.size,
-      url
-    });
-
     // Get the PDF URL - either from file upload or direct URL
     let pdfUrl: string;
     if (file) {
@@ -105,7 +93,6 @@ export async function POST(request: Request) {
         );
       }
     } else if (url) {
-      // Validate URL
       try {
         new URL(url);
         pdfUrl = url;
@@ -122,16 +109,6 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-
-    console.log('Creating paper record with data:', {
-      title,
-      authors,
-      year,
-      abstract,
-      category_id: categoryId,
-      user_id: user.id,
-      url: pdfUrl
-    });
 
     // Create paper record in database
     const { data: paper, error: dbError } = await createPaper({

@@ -5,8 +5,36 @@ import { Navbar } from "@/components/landing/navbar"
 import { Footer } from "@/components/landing/footer"
 import { motion } from "framer-motion"
 import { EarlyAccess } from "@/components/landing/early-access"
+import { FilterSortDialog } from "@/components/library/filter-sort-dialog"
+import { SlidersHorizontal } from "lucide-react"
+import { useState } from "react"
+import { Button } from "@/components/ui/button"
 
 export default function LandingPage() {
+  const [isFilterSortOpen, setIsFilterSortOpen] = useState(false)
+
+  const handleFilterSort = ({ sortBy }: { sortBy: string }) => {
+    // Handle both filtering and sorting here
+    let sorted = [...papers]
+    
+    switch (sortBy) {
+      case "recent":
+        sorted.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        break
+      case "oldest":
+        sorted.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+        break
+      case "title":
+        sorted.sort((a, b) => a.title.localeCompare(b.title))
+        break
+      case "year":
+        sorted.sort((a, b) => b.year - a.year)
+        break
+    }
+    
+    setPapers(sorted)
+  }
+
   return (
     <motion.div 
       initial={{ opacity: 0 }}
@@ -44,6 +72,11 @@ export default function LandingPage() {
         </main>
         <Footer />
       </div>
+      <FilterSortDialog
+        open={isFilterSortOpen}
+        onOpenChange={setIsFilterSortOpen}
+        onApply={handleFilterSort}
+      />
     </motion.div>
   )
 }

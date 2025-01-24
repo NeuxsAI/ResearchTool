@@ -107,6 +107,10 @@ export default function CategoryPage() {
     ));
   };
 
+  const handlePaperAdded = (newPaper: Paper) => {
+    setPapers(prevPapers => [...prevPapers, newPaper]);
+  };
+
   if (isLoading) {
     return <MainLayout>
       <div className="h-full flex items-center justify-center">
@@ -143,7 +147,12 @@ export default function CategoryPage() {
                   <Plus className="h-3 w-3 mr-2" />
                   Add paper
                 </Button>
-                <AddPaperDialog open={isAddPaperOpen} onOpenChange={setIsAddPaperOpen} categoryId={category.id} />
+                <AddPaperDialog 
+                  open={isAddPaperOpen} 
+                  onOpenChange={setIsAddPaperOpen} 
+                  categoryId={category?.id}
+                  onPaperAdded={handlePaperAdded}
+                />
               </>
             )}
           </div>
@@ -171,7 +180,12 @@ export default function CategoryPage() {
                 <Plus className="h-3 w-3 mr-2" />
                 Add paper
               </Button>
-              <AddPaperDialog open={isAddPaperOpen} onOpenChange={setIsAddPaperOpen} categoryId={category.id} />
+              <AddPaperDialog 
+                open={isAddPaperOpen} 
+                onOpenChange={setIsAddPaperOpen} 
+                categoryId={category?.id}
+                onPaperAdded={handlePaperAdded}
+              />
             </div>
           </div>
         </div>

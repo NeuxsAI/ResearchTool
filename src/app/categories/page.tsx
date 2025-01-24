@@ -104,6 +104,10 @@ export default function CategoriesPage() {
     router.push(`/paper/${paper.id}`);
   };
 
+  const handlePaperAdded = (newPaper: Paper) => {
+    setPapers(prevPapers => [...prevPapers, newPaper]);
+  };
+
   return (
     <motion.div 
       className="flex flex-col h-full"
@@ -261,6 +265,7 @@ export default function CategoriesPage() {
       <AddPaperDialog 
         open={isAddPaperOpen} 
         onOpenChange={setIsAddPaperOpen} 
+        onPaperAdded={handlePaperAdded}
       />
     </motion.div>
   );
