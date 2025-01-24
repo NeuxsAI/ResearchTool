@@ -355,7 +355,105 @@ export default function LibraryPage() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 min-h-0 p-4">
+      <div className="flex-1 min-h-0 p-4 flex">
+        {/* Activity Sidebar */}
+        <motion.div 
+            className="w-[300px] flex-shrink-0"
+            initial={{ x: 20, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            transition={{ duration: 0.3, delay: 0.2 }}
+          >
+            
+            <div className="w-[240px] border-r border-[#2a2a2a] bg-[#1c1c1c] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] h-full ">
+              <h3 className="text-sm font-medium text-white mb-4">Recent Activity</h3>
+              
+              {/* Reading Progress */}
+              <div className="mb-6">
+                <h4 className="text-xs font-medium text-[#888] mb-2">
+                  Reading List
+                </h4>
+                <div className="space-y-2">
+                  {readingList.slice(0, 3).map(item => {
+                    const paper = papers.find(p => p.id === item.paper_id);
+                    if (!paper) return null;
+                    
+                    return (
+                      <div 
+                        key={item.id} 
+                        className="flex items-center gap-2 hover:bg-[#2a2a2a] p-1.5 rounded cursor-pointer transition-colors group"
+                        onClick={() => handlePaperClick(paper)}
+                      >
+                        <BookOpen className="h-3.5 w-3.5 text-violet-500" />
+                        <span className="text-[11px] text-[#888] group-hover:text-white truncate">
+                          {paper.title}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Recent Annotations */}
+              <div className="mb-6">
+                <h4 className="text-xs font-medium text-[#888] mb-2">
+                  Recent Annotations
+                </h4>
+                <div className="space-y-2">
+                  {recentAnnotations.map(annotation => {
+                    const paper = papers.find(p => p.id === annotation.paper_id);
+                    if (!paper) return null;
+                    return (
+                      <div 
+                        key={annotation.id} 
+                        className="space-y-1 hover:bg-[#2a2a2a] p-1.5 rounded cursor-pointer transition-colors group"
+                        onClick={() => handlePaperClick(paper)}
+                      >
+                        <p className="text-[11px] text-violet-400/50 group-hover:text-white line-clamp-2">
+                          {annotation.content}
+                        </p>
+                        <p className="text-[10px] text-[#666] group-hover:text-[#888]">
+                          on {paper.title}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Active Chats */}
+              <div>
+                <h4 className="text-xs font-medium text-[#888] mb-2">
+                  Active Conversations
+                </h4>
+                <div className="space-y-2">
+                  {recentAnnotations
+                    .filter(a => a.chat_history && a.chat_history.length > 0)
+                    .slice(0, 3)
+                    .map(annotation => {
+                      const paper = papers.find(p => p.id === annotation.paper_id);
+                      if (!paper) return null;
+                      return (
+                        <div 
+                          key={annotation.id} 
+                          className="flex items-center gap-2 hover:bg-[#2a2a2a] p-1.5 rounded cursor-pointer transition-colors group"
+                          onClick={() => handlePaperClick(paper)}
+                        >
+                          <Activity className="h-3.5 w-3.5 text-emerald-500" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[11px] text-[#888] group-hover:text-white truncate">
+                              {paper.title}
+                            </p>
+                            <p className="text-[10px] text-[#666] group-hover:text-[#888]">
+                              {annotation.chat_history?.length} messages
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            </div>
+          </motion.div>
         <div className="h-full flex gap-4">
           {/* Papers List */}
           <div className="flex-1 min-w-0">
@@ -457,104 +555,6 @@ export default function LibraryPage() {
               )}
             </ScrollArea>
           </div>
-
-          {/* Activity Sidebar */}
-          <motion.div 
-            className="w-[300px] flex-shrink-0"
-            initial={{ x: 20, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            transition={{ duration: 0.3, delay: 0.2 }}
-          >
-            <Card className="h-full p-4 bg-[#1c1c1c] border-[#2a2a2a] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-              <h3 className="text-sm font-medium text-white mb-4">Recent Activity</h3>
-              
-              {/* Reading Progress */}
-              <div className="mb-6">
-                <h4 className="text-xs font-medium text-[#888] mb-2">
-                  Reading List
-                </h4>
-                <div className="space-y-2">
-                  {readingList.slice(0, 3).map(item => {
-                    const paper = papers.find(p => p.id === item.paper_id);
-                    if (!paper) return null;
-                    
-                    return (
-                      <div 
-                        key={item.id} 
-                        className="flex items-center gap-2 hover:bg-[#2a2a2a] p-1.5 rounded cursor-pointer transition-colors group"
-                        onClick={() => handlePaperClick(paper)}
-                      >
-                        <BookOpen className="h-3.5 w-3.5 text-violet-500" />
-                        <span className="text-[11px] text-[#888] group-hover:text-white truncate">
-                          {paper.title}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Recent Annotations */}
-              <div className="mb-6">
-                <h4 className="text-xs font-medium text-[#888] mb-2">
-                  Recent Annotations
-                </h4>
-                <div className="space-y-2">
-                  {recentAnnotations.map(annotation => {
-                    const paper = papers.find(p => p.id === annotation.paper_id);
-                    if (!paper) return null;
-                    return (
-                      <div 
-                        key={annotation.id} 
-                        className="space-y-1 hover:bg-[#2a2a2a] p-1.5 rounded cursor-pointer transition-colors group"
-                        onClick={() => handlePaperClick(paper)}
-                      >
-                        <p className="text-[11px] text-[#aaa] group-hover:text-white line-clamp-2">
-                          {annotation.content}
-                        </p>
-                        <p className="text-[10px] text-[#666] group-hover:text-[#888]">
-                          on {paper.title}
-                        </p>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Active Chats */}
-              <div>
-                <h4 className="text-xs font-medium text-[#888] mb-2">
-                  Active Conversations
-                </h4>
-                <div className="space-y-2">
-                  {recentAnnotations
-                    .filter(a => a.chat_history && a.chat_history.length > 0)
-                    .slice(0, 3)
-                    .map(annotation => {
-                      const paper = papers.find(p => p.id === annotation.paper_id);
-                      if (!paper) return null;
-                      return (
-                        <div 
-                          key={annotation.id} 
-                          className="flex items-center gap-2 hover:bg-[#2a2a2a] p-1.5 rounded cursor-pointer transition-colors group"
-                          onClick={() => handlePaperClick(paper)}
-                        >
-                          <Activity className="h-3.5 w-3.5 text-emerald-500" />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[11px] text-[#888] group-hover:text-white truncate">
-                              {paper.title}
-                            </p>
-                            <p className="text-[10px] text-[#666] group-hover:text-[#888]">
-                              {annotation.chat_history?.length} messages
-                            </p>
-                          </div>
-                        </div>
-                      );
-                    })}
-                </div>
-              </div>
-            </Card>
-          </motion.div>
         </div>
       </div>
 
