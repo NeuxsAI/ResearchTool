@@ -355,7 +355,7 @@ export default function LibraryPage() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 min-h-0 p-4 flex">
+      <div className="flex-1 min-h-0 flex">
         {/* Activity Sidebar */}
         <motion.div 
             className="w-[300px] flex-shrink-0"
@@ -364,7 +364,7 @@ export default function LibraryPage() {
             transition={{ duration: 0.3, delay: 0.2 }}
           >
             
-            <div className="w-[240px] border-r border-[#2a2a2a] bg-[#1c1c1c] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] h-full ">
+            <div className="w-[260px] p-4 border-r border-[#2a2a2a] bg-[#1c1c1c] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] h-full ">
               <h3 className="text-sm font-medium text-white mb-4">Recent Activity</h3>
               
               {/* Reading Progress */}
@@ -454,7 +454,7 @@ export default function LibraryPage() {
               </div>
             </div>
           </motion.div>
-        <div className="h-full flex gap-4">
+        <div className="h-full flex gap-4 p-4">
           {/* Papers List */}
           <div className="flex-1 min-w-0">
             <ScrollArea className="h-full">
