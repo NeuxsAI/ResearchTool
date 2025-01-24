@@ -44,10 +44,6 @@ const nextConfig = {
     async rewrites() {
       return [
         {
-          source: '/category/:slug*',
-          destination: '/category/[slug]'
-        },
-        {
           source: '/paper/:id*',
           destination: '/paper/[id]'
         },

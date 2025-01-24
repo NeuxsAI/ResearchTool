@@ -42,7 +42,16 @@ export async function createCategory(category: Partial<Category>): Promise<DbRes
 
 export async function updateCategory(id: string, category: Partial<Category>): Promise<DbResult<Category>> {
   const supabase = createBrowserClient()
-  return await supabase.from('categories').update(category).eq('id', id).select().single()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { data: null, error: new Error('Not authenticated') }
+  
+  return await supabase
+    .from('categories')
+    .update(category)
+    .eq('id', id)
+    .eq('user_id', user.id)
+    .select()
+    .single()
 }
 
 export async function deleteCategory(id: string): Promise<DbResult<Category>> {

@@ -339,7 +339,7 @@ export default function LibraryPage() {
                       className="space-y-1 hover:bg-[#2a2a2a] p-1.5 rounded cursor-pointer transition-colors group"
                       onClick={() => handlePaperClick(paper)}
                     >
-                      <p className="text-[11px] text-emerald-600 group-hover:text-white line-clamp-2">
+                      <p className="text-[11px] text-slate-100 group-hover:text-white line-clamp-2">
                         {annotation.content}
                       </p>
                       <p className="text-[10px] text-[#666] group-hover:text-[#888]">
