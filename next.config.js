@@ -40,19 +40,6 @@ const nextConfig = {
       ignoreDuringBuilds: true
     },
     staticPageGenerationTimeout: 120,
-    // Add configuration for dynamic routes
-    async rewrites() {
-      return [
-        {
-          source: '/paper/:id*',
-          destination: '/paper/[id]'
-        },
-        {
-          source: '/canvas/:id*',
-          destination: '/canvas/[id]'
-        }
-      ]
-    }
   };
   
   module.exports = nextConfig;

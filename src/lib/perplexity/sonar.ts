@@ -31,7 +31,7 @@ export async function searchPapers({
   impact = "any-impact",
   topics = [],
   page = 1,
-  limit = 10
+  limit = 25
 }: SonarSearchParams): Promise<SonarSearchResponse> {
   const SONAR_API_KEY = process.env.PERPLEXITY_SONAR_API_KEY;
   
@@ -56,7 +56,7 @@ Apply these filters:
 - Impact level: ${impact}
 - Topics: ${topics.join(", ")}
 
-Your response must be ONLY the JSON array, nothing else.`;
+Your response must be ONLY the JSON array, nothing else. Try to fetch at least 3 papers, you can fetch more if you can (that's preferable) however no more than 25 and please rank by relevance to the query.`;
 
   try {
     const response = await fetch("https://api.perplexity.ai/chat/completions", {

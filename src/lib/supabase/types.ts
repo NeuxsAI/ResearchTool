@@ -10,16 +10,26 @@ export interface Category {
 
 export interface Paper {
   id: string;
-  title?: string;
-  authors?: string[];
-  year?: number;
+  title: string;
   abstract?: string;
-  category_id?: string;
-  annotations_count?: number;
+  authors: string[];
+  year: number;
+  citations?: number;
+  impact?: 'high' | 'low';
   url?: string;
+  topics?: string[];
+  category_id?: string;
+  category?: {
+    id: string;
+    name: string;
+    color?: string;
+  };
   user_id?: string;
   created_at?: string;
   updated_at?: string;
+  scheduled_date?: string;
+  estimated_time?: number;
+  repeat?: 'daily' | 'weekly' | 'monthly' | 'none';
 }
 
 export interface Annotation {
@@ -60,6 +70,11 @@ export interface ReadingListItem {
   paper_id: string;
   user_id: string;
   added_at: string;
+  scheduled_date?: string;
+  estimated_time?: number;
+  status?: 'unread' | 'in_progress' | 'completed';
+  repeat?: 'daily' | 'weekly' | 'monthly' | 'none';
+  updated_at?: string;
 }
 
 export interface DbResult<T> {
