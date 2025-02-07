@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, MessageSquare, Pencil, LayoutGrid, List } from "lucide-react";
 import { MainLayout } from "@/components/layout/main-layout";
@@ -11,6 +10,7 @@ import { getPapers, getCategories } from "@/lib/supabase/db";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PaperCard } from "@/components/paper-card";
 
 interface Paper {
   id: string;
@@ -24,6 +24,15 @@ interface Paper {
   url?: string;
   created_at?: string;
   updated_at?: string;
+  abstract?: string;
+  citations?: number;
+  institution?: string;
+  impact?: "high" | "low";
+  topics?: string[];
+  scheduled_date?: string;
+  estimated_time?: number;
+  repeat?: "daily" | "weekly" | "monthly" | "none";
+  in_reading_list?: boolean;
 }
 
 // Animation variants
@@ -100,7 +109,7 @@ export default function RecentPage() {
   const renderSkeletons = () => (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
       {[...Array(6)].map((_, i) => (
-        <Card key={i} className="p-3 bg-[#2a2a2a] border-[#333]">
+        <div key={i} className="p-3 bg-[#2a2a2a] border-[#333]">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5 mb-1">
               <Skeleton className="h-3 w-16" />
@@ -116,7 +125,7 @@ export default function RecentPage() {
               </div>
             </div>
           </div>
-        </Card>
+        </div>
       ))}
     </div>
   );
@@ -153,7 +162,7 @@ export default function RecentPage() {
         </div>
 
         <div className="p-6">
-          <div className="max-w-5xl">
+          <div className="w-full">
             <Tabs defaultValue="grid" className="w-full">
               <motion.div 
                 className="flex items-center justify-between mb-4"
@@ -197,59 +206,21 @@ export default function RecentPage() {
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                       >
-                        <Card 
-                          className="p-3 bg-[#2a2a2a] border-[#333] hover:bg-[#333] transition-colors cursor-pointer"
-                          onClick={() => handlePaperClick(paper)}
-                        >
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-1.5 text-[11px] text-[#666] mb-1">
-                              {paper.category && (
-                                <span className="flex items-center gap-1.5">
-                                  <div 
-                                    className="w-1.5 h-1.5 rounded-full" 
-                                    style={{ backgroundColor: paper.category_color || '#666' }}
-                                  />
-                                  {paper.category}
-                                </span>
-                              )}
-                              <span>•</span>
-                              <span>{paper.year}</span>
-                            </div>
-                            <h3 className="text-[11px] font-medium text-[#eee] mb-1 line-clamp-2">{paper.title}</h3>
-                            <p className="text-[11px] text-[#888] truncate mb-3">{paper.authors?.join(", ")}</p>
-                            <div className="flex items-center justify-between pt-2 border-t border-[#333]">
-                              <div className="flex items-center gap-1">
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
-                                  className="h-6 w-6 text-[#666] hover:text-[#888] hover:bg-[#333]"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    // TODO: Add edit functionality
-                                  }}
-                                >
-                                  <Pencil className="h-3 w-3" />
-                                </Button>
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
-                                  className="h-6 w-6 text-[#666] hover:text-[#888] hover:bg-[#333]"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    // TODO: Add annotation functionality
-                                  }}
-                                >
-                                  <MessageSquare className="h-3 w-3" />
-                                  {paper.annotations_count > 0 && (
-                                    <span className="absolute top-0.5 right-0.5 text-[10px] text-[#888]">
-                                      {paper.annotations_count}
-                                    </span>
-                                  )}
-                                </Button>
-                              </div>
-                            </div>
-                          </div>
-                        </Card>
+                        <PaperCard
+                          paper={{
+                            ...paper,
+                            citations: 0,
+                            impact: "low",
+                            topics: [],
+                            category: paper.category_id ? {
+                              id: paper.category_id,
+                              name: paper.category || "",
+                              color: paper.category_color
+                            } : undefined
+                          }}
+                          onAddToList={() => {}}
+                          onSchedule={() => {}}
+                        />
                       </motion.div>
                     ))}
                   </motion.div>
@@ -260,7 +231,7 @@ export default function RecentPage() {
                 {isLoading ? (
                   <div className="space-y-2">
                     {[...Array(6)].map((_, i) => (
-                      <Card key={i} className="p-3 bg-[#2a2a2a] border-[#333]">
+                      <div key={i} className="p-3 bg-[#2a2a2a] border-[#333]">
                         <div className="flex items-start gap-3">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5 mb-1">
@@ -276,7 +247,7 @@ export default function RecentPage() {
                             <Skeleton className="h-6 w-6 rounded" />
                           </div>
                         </div>
-                      </Card>
+                      </div>
                     ))}
                   </div>
                 ) : (
@@ -293,59 +264,21 @@ export default function RecentPage() {
                         whileHover={{ scale: 1.01 }}
                         whileTap={{ scale: 0.99 }}
                       >
-                        <Card 
-                          className="p-3 bg-[#2a2a2a] border-[#333] hover:bg-[#333] transition-colors cursor-pointer"
-                          onClick={() => handlePaperClick(paper)}
-                        >
-                          <div className="flex items-start gap-3">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-1.5 text-[11px] text-[#666] mb-1">
-                                {paper.category && (
-                                  <span className="flex items-center gap-1.5">
-                                    <div 
-                                      className="w-1.5 h-1.5 rounded-full" 
-                                      style={{ backgroundColor: paper.category_color || '#666' }}
-                                    />
-                                    {paper.category}
-                                  </span>
-                                )}
-                                <span>•</span>
-                                <span>{paper.year}</span>
-                              </div>
-                              <h3 className="text-[11px] font-medium text-[#eee] mb-1 truncate">{paper.title}</h3>
-                              <p className="text-[11px] text-[#888] truncate">{paper.authors?.join(", ")}</p>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-6 w-6 text-[#666] hover:text-[#888] hover:bg-[#333]"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  // TODO: Add edit functionality
-                                }}
-                              >
-                                <Pencil className="h-3 w-3" />
-                              </Button>
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-6 w-6 text-[#666] hover:text-[#888] hover:bg-[#333]"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  // TODO: Add annotation functionality
-                                }}
-                              >
-                                <MessageSquare className="h-3 w-3" />
-                                {paper.annotations_count > 0 && (
-                                  <span className="absolute top-0.5 right-0.5 text-[10px] text-[#888]">
-                                    {paper.annotations_count}
-                                  </span>
-                                )}
-                              </Button>
-                            </div>
-                          </div>
-                        </Card>
+                        <PaperCard
+                          paper={{
+                            ...paper,
+                            citations: 0,
+                            impact: "low",
+                            topics: [],
+                            category: paper.category_id ? {
+                              id: paper.category_id,
+                              name: paper.category || "",
+                              color: paper.category_color
+                            } : undefined
+                          }}
+                          onAddToList={() => {}}
+                          onSchedule={() => {}}
+                        />
                       </motion.div>
                     ))}
                   </motion.div>

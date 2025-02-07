@@ -95,7 +95,7 @@ export function FAQ() {
             </span>
           </h2>
           <p className="text-lg text-[#888] max-w-2xl mx-auto">
-            Everything you need to know about nexusmind and how it can transform your research workflow.
+            Everything you need to know about Nexus and how it can transform your research workflow.
           </p>
         </motion.div>
 

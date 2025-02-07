@@ -40,8 +40,7 @@ export function Navbar() {
           className="flex items-center gap-2"
         >
           <Link href="/" className="flex items-center gap-2">
-            <span className="text-lg font-medium text-white/90">nexus</span>
-            <span className="text-lg font-medium bg-gradient-to-r from-purple-500 via-blue-500 to-indigo-500 text-transparent bg-clip-text">mind</span>
+            <span className="text-lg font-medium bg-gradient-to-r from-blue-400 to-blue-600 text-transparent bg-clip-text">Nexus</span>
           </Link>
         </motion.div>
         <motion.div 

@@ -30,8 +30,8 @@ export function FilterSortDialog({
   open, 
   onOpenChange, 
   onApply,
-  categories,
-  selectedCategories: initialSelectedCategories 
+  categories = [], 
+  selectedCategories: initialSelectedCategories = [] 
 }: FilterSortDialogProps) {
   const [sortBy, setSortBy] = useState("recent");
   const [selectedCategories, setSelectedCategories] = useState(initialSelectedCategories);

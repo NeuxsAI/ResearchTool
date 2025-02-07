@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import { cn } from "../lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -35,42 +35,61 @@ export interface Paper {
 
 interface PaperCardProps {
   paper: Paper;
-  onAddToList: () => void;
+  onAddToList?: () => void;
   onSchedule?: (date: Date, estimatedTime?: number, repeat?: "daily" | "weekly" | "monthly" | "none") => void;
+  onChangeCategory?: () => void;
   isLoading?: boolean;
 }
 
-export function PaperCard({ paper, onAddToList, onSchedule, isLoading }: PaperCardProps) {
+export function PaperCard({ paper, onAddToList, onSchedule, onChangeCategory, isLoading }: PaperCardProps) {
   const [date, setDate] = useState<Date>();
   const [estimatedTime, setEstimatedTime] = useState<string>("");
   const [repeat, setRepeat] = useState<"daily" | "weekly" | "monthly" | "none">("none");
   const [open, setOpen] = useState(false);
 
+  // Initialize scheduled state from paper prop
+  const isScheduled = !!paper.scheduled_date;
+
   const handleAddToList = (e: React.MouseEvent) => {
     if (isLoading) return;
-    console.log('Add to list button clicked');
     e.stopPropagation();
-    console.log('Calling onAddToList with paper:', paper);
-    onAddToList();
+    onAddToList?.();
   };
+
+  const handleSchedule = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (date && onSchedule) {
+      onSchedule(date, estimatedTime ? parseInt(estimatedTime) : undefined, repeat);
+      setOpen(false);
+    }
+  };
+
+  // Set initial date if paper is scheduled
+  useEffect(() => {
+    if (paper.scheduled_date) {
+      setDate(new Date(paper.scheduled_date));
+      setEstimatedTime(paper.estimated_time?.toString() || "");
+      setRepeat(paper.repeat || "none");
+    }
+  }, [paper.scheduled_date, paper.estimated_time, paper.repeat]);
 
   return (
     <motion.div 
-      whileHover={{ scale: 1.01 }}
+      whileHover={{ scale: 0.99 }}
       whileTap={{ scale: 0.99 }}
     >
       <Card className={cn(
-        "p-4 hover:bg-[#2a2a2a] transition-colors cursor-pointer border-[#2a2a2a]",
+        "p-4 hover:bg-[#2a2a2a] transition-colors cursor-pointer border-[#2a2a2a] min-h-[150px] flex flex-col",
         isLoading && "opacity-50 pointer-events-none"
       )}>
-        <div className="flex items-start gap-4">
+        <div className="flex items-start gap-4 flex-grow">
           <div className="flex-shrink-0 w-10 h-10 rounded bg-[#2a2a2a] flex items-center justify-center">
             <FileText className="h-5 w-5 text-[#666]" />
           </div>
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 flex flex-col">
             <div className="flex items-start justify-between gap-4 mb-2">
               <div>
-                <h3 className="text-sm font-medium text-white leading-tight mb-1">
+                <h3 className="text-sm font-medium text-white leading-tight mb-1 line-clamp-2">
                   {paper.title}
                 </h3>
                 <div className="flex items-center gap-3 text-[11px] text-[#666]">
@@ -107,108 +126,142 @@ export function PaperCard({ paper, onAddToList, onSchedule, isLoading }: PaperCa
                 {paper.abstract}
               </p>
             )}
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex flex-wrap gap-1.5">
-                {paper.topics.map((topic) => (
-                  <Badge 
-                    key={topic}
-                    variant="secondary" 
-                    className="bg-[#2a2a2a] hover:bg-[#333] text-[10px] px-1.5 py-0 text-[#888]"
-                  >
-                    {topic}
-                  </Badge>
-                ))}
-              </div>
-              <div className="flex items-center gap-2">
-                {onSchedule && (
-                  <Popover open={open} onOpenChange={setOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2.5 text-[11px] hover:bg-[#333] text-white bg-[#2a2a2a]"
-                        onClick={(e) => {
-                          if (isLoading) return;
-                          e.stopPropagation();
-                          setOpen(true);
-                        }}
-                        disabled={isLoading}
-                      >
-                        <Calendar className="h-3.5 w-3.5 mr-1.5" />
-                        {paper.scheduled_date ? 'Reschedule' : 'Schedule'}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="end">
-                      <div className="p-3">
-                        <div className="space-y-2">
-                          <div>
-                            <CalendarComponent
-                              mode="single"
-                              selected={date}
-                              onSelect={setDate}
-                              className="rounded-md border"
-                            />
-                          </div>
-                          <div className="flex gap-2">
-                            <div className="flex-1">
-                              <Input
-                                type="number"
-                                placeholder="Est. time (min)"
-                                className="h-8 text-xs"
-                                value={estimatedTime}
-                                onChange={(e) => setEstimatedTime(e.target.value)}
-                              />
-                            </div>
-                            <Select value={repeat} onValueChange={(value: any) => setRepeat(value)}>
-                              <SelectTrigger className="h-8 text-xs">
-                                <SelectValue placeholder="Repeat" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="none">No repeat</SelectItem>
-                                <SelectItem value="daily">Daily</SelectItem>
-                                <SelectItem value="weekly">Weekly</SelectItem>
-                                <SelectItem value="monthly">Monthly</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <Button 
-                            className="w-full h-8 text-xs"
-                            onClick={() => {
-                              if (date && onSchedule) {
-                                onSchedule(date, estimatedTime ? parseInt(estimatedTime) : undefined, repeat);
-                                setOpen(false);
-                              }
-                            }}
-                          >
-                            Schedule Paper
-                          </Button>
-                        </div>
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                )}
+            <div className="flex flex-wrap gap-1.5">
+              {paper.topics.map((topic) => (
+                <Badge 
+                  key={topic}
+                  variant="secondary" 
+                  className="bg-[#2a2a2a] hover:bg-[#333] text-[10px] px-1.5 py-0 text-[#888]"
+                >
+                  {topic}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Fixed button container at bottom */}
+        <div 
+          className="flex items-center justify-end gap-2 mt-1 pt-2"
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+          }}
+        >
+          {onSchedule && (
+            <Popover 
+              open={open} 
+              onOpenChange={(isOpen) => {
+                setOpen(isOpen);
+              }}
+            >
+              <PopoverTrigger asChild>
                 <Button
                   variant="ghost"
                   size="sm"
                   className={cn(
-                    "h-7 px-2.5 text-[11px] hover:bg-[#333]",
-                    paper.in_reading_list
-                      ? "bg-violet-500/10 text-violet-500 hover:bg-violet-500/20"
-                      : "bg-[#2a2a2a] text-white",
-                    isLoading && "opacity-50 cursor-not-allowed"
+                    "h-7 px-2.5 text-[11px] hover:bg-[#333] text-white",
+                    isScheduled ? "bg-violet-500/10 text-violet-500" : "bg-[#2a2a2a]"
                   )}
-                  onClick={handleAddToList}
+                  onClick={(e) => {
+                    if (isLoading) return;
+                    e.stopPropagation();
+                    e.preventDefault();
+                    setOpen(true);
+                  }}
                   disabled={isLoading}
                 >
-                  <BookMarked className={cn(
-                    "h-3.5 w-3.5 mr-1.5",
-                    isLoading && "animate-pulse"
-                  )} />
-                  {paper.in_reading_list ? 'Added to List' : 'Add to List'}
+                  <Calendar className="h-3.5 w-3.5 mr-1.5" />
+                  {isScheduled ? 'Scheduled' : 'Schedule'}
                 </Button>
-              </div>
-            </div>
-          </div>
+              </PopoverTrigger>
+              <PopoverContent 
+                className="w-auto p-0" 
+                align="end"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                }}
+              >
+                <div className="p-3">
+                  <div className="space-y-2">
+                    <div>
+                      <CalendarComponent
+                        mode="single"
+                        selected={date}
+                        onSelect={setDate}
+                        className="rounded-md border"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <div className="flex-1">
+                        <Input
+                          type="number"
+                          placeholder="Est. time (min)"
+                          className="h-8 text-xs"
+                          value={estimatedTime}
+                          onChange={(e) => setEstimatedTime(e.target.value)}
+                        />
+                      </div>
+                      <Select value={repeat} onValueChange={(value: any) => setRepeat(value)}>
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="Repeat" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No repeat</SelectItem>
+                          <SelectItem value="daily">Daily</SelectItem>
+                          <SelectItem value="weekly">Weekly</SelectItem>
+                          <SelectItem value="monthly">Monthly</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button 
+                      className="w-full h-8 text-xs"
+                      onClick={handleSchedule}
+                      disabled={!date}
+                    >
+                      {isScheduled ? 'Update Schedule' : 'Schedule Paper'}
+                    </Button>
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
+          {paper.category ? (
+            onChangeCategory && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2.5 text-[11px] hover:bg-[#333] bg-[#2a2a2a] text-white"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  onChangeCategory();
+                }}
+                disabled={isLoading}
+              >
+                <BookMarked className="h-3.5 w-3.5 mr-1.5" />
+                Change Category
+              </Button>
+            )
+          ) : (
+            onAddToList && !paper.in_reading_list && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2.5 text-[11px] hover:bg-[#333] bg-[#2a2a2a] text-white"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  handleAddToList(e);
+                }}
+                disabled={isLoading}
+              >
+                <BookMarked className="h-3.5 w-3.5 mr-1.5" />
+                Add to list
+              </Button>
+            )
+          )}
         </div>
       </Card>
     </motion.div>
@@ -228,4 +281,4 @@ export function PaperCardSkeleton() {
       </div>
     </Card>
   );
-} 
+}

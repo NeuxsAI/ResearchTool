@@ -7,14 +7,16 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileText, Plus, Grid2x2, Search, Clock, BookOpen, Filter, Activity, MessageSquare, ChevronDown, SlidersHorizontal } from "lucide-react";
 import { AddPaperDialog } from "@/components/library/add-paper-dialog";
-import { getPapers, getCategories, getReadingList, getAnnotationsByPaper } from "@/lib/supabase/db";
+import { getPapers, getCategories, getReadingList, getAnnotationsByPaper, schedulePaper, addToReadingList } from "@/lib/supabase/db";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { FilterSortDialog } from "@/components/library/filter-sort-dialog";
+import { PaperCard } from "@/components/paper-card";
 import { Paper } from "@/lib/types";
+import { useCategories } from "@/lib/context/categories-context";
 
 interface Category {
   id: string;
@@ -59,10 +61,10 @@ const itemVariants = {
 
 export default function LibraryPage() {
   const router = useRouter();
+  const { categories, isLoading: isCategoriesLoading } = useCategories();
   // State
   const [isAddPaperOpen, setIsAddPaperOpen] = useState(false);
   const [papers, setPapers] = useState<Paper[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
   const [readingList, setReadingList] = useState<ReadingListItem[]>([]);
   const [recentAnnotations, setRecentAnnotations] = useState<Annotation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -70,7 +72,7 @@ export default function LibraryPage() {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [showAllCategories, setShowAllCategories] = useState(false);
-  const [isFilterSortOpen, setIsFilterSortOpen] = useState(false);
+  const [filterDialogOpen, setFilterDialogOpen] = useState(false);
 
   // Fetch data
   useEffect(() => {
@@ -80,18 +82,13 @@ export default function LibraryPage() {
         
         // First fetch papers, categories, and reading list
         console.log("Fetching initial data...");
-        const [papersResult, categoriesResult, readingListResult] = await Promise.all([
+        const [papersResult, readingListResult] = await Promise.all([
           getPapers(),
-          getCategories(),
           getReadingList()
         ]);
 
         if (papersResult.error) {
           console.error("Error fetching papers:", papersResult.error);
-          return;
-        }
-        if (categoriesResult.error) {
-          console.error("Error fetching categories:", categoriesResult.error);
           return;
         }
         if (readingListResult.error) {
@@ -100,7 +97,6 @@ export default function LibraryPage() {
         }
 
         setPapers(papersResult.data || []);
-        setCategories(categoriesResult.data || []);
         setReadingList(readingListResult.data || []);
 
         // Get recent annotations
@@ -195,7 +191,7 @@ export default function LibraryPage() {
     setPapers(prevPapers => [...prevPapers, newPaper]);
   };
 
-  const handleFilterSort = ({ sortBy, categories: newSelectedCategories }: { sortBy: string; categories: string[] }) => {
+  const handleFilterApply = ({ sortBy, categories: newSelectedCategories }: { sortBy: string; categories: string[] }) => {
     // Update selected categories
     setSelectedCategories(newSelectedCategories);
     
@@ -218,6 +214,46 @@ export default function LibraryPage() {
     });
     
     setPapers(sorted);
+  };
+
+  const handleSchedulePaper = async (paperId: string, date: Date, estimatedTime?: number, repeat?: "daily" | "weekly" | "monthly" | "none") => {
+    try {
+      const result = await schedulePaper(paperId, date, estimatedTime, repeat);
+      if (result.error) {
+        console.error("Error scheduling paper:", result.error);
+        return;
+      }
+
+      // Update papers state to reflect scheduling
+      setPapers(prevPapers => 
+        prevPapers.map(paper => 
+          paper.id === paperId 
+            ? { 
+                ...paper, 
+                scheduled_date: date.toISOString(),
+                estimated_time: estimatedTime,
+                repeat: repeat
+              }
+            : paper
+        )
+      );
+    } catch (error) {
+      console.error("Error scheduling paper:", error);
+    }
+  };
+
+  const renderFilterDialog = () => {
+    if (isCategoriesLoading) return null;
+    
+    return (
+      <FilterSortDialog
+        open={filterDialogOpen}
+        onOpenChange={setFilterDialogOpen}
+        categories={categories}
+        selectedCategories={selectedCategories}
+        onApply={handleFilterApply}
+      />
+    );
   };
 
   return (
@@ -266,7 +302,7 @@ export default function LibraryPage() {
 
             {/* Filter and Sort Button */}
             <Button
-              onClick={() => setIsFilterSortOpen(true)}
+              onClick={() => setFilterDialogOpen(true)}
               className="h-8 px-3 text-[11px] bg-[#2a2a2a] hover:bg-[#333] text-white"
             >
               <SlidersHorizontal className="h-3 w-3 mr-1" />
@@ -405,7 +441,7 @@ export default function LibraryPage() {
               </div>
             ) : (
               <motion.div 
-                className="space-y-1 p-2 max-w-3xl mx-auto"
+                className="space-y-1 p-2 mx-auto"
                 variants={containerVariants}
                 initial="hidden"
                 animate="visible"
@@ -441,42 +477,26 @@ export default function LibraryPage() {
                             whileHover={{ scale: 1.01 }}
                             whileTap={{ scale: 0.99 }}
                           >
-                            <Card 
-                              className="flex items-start gap-1.5 p-2 m-2 hover:bg-[#2a2a2a] transition-colors group border-[#2a2a2a] cursor-pointer"
-                              onClick={() => handlePaperClick(paper)}
-                            >
-                              <div className="flex-shrink-0 w-8 h-8 rounded bg-[#2a2a2a] flex items-center justify-center group-hover:bg-[#333]">
-                                <FileText className="h-4 w-4 text-[#666]" />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-1.5 mb-0.5">
-                                  {paper.year && (
-                                    <span className="text-[10px] text-[#666]">
-                                      {paper.year}
-                                    </span>
-                                  )}
-                                  {getReadingStatus(paper.id) && (
-                                    <Badge variant="outline" className="h-3.5 px-1 text-[9px] border-violet-500/30 text-violet-500">
-                                      Reading
-                                    </Badge>
-                                  )}
-                                  {paper.annotations_count && paper.annotations_count > 0 && (
-                                    <span className="text-[9px] text-[#666] flex items-center gap-0.5">
-                                      <MessageSquare className="h-3 w-3" />
-                                      {paper.annotations_count}
-                                    </span>
-                                  )}
-                                </div>
-                                <h3 className="text-[11px] font-medium text-white truncate leading-snug mb-0.5">
-                                  {paper.title}
-                                </h3>
-                                {paper.authors && (
-                                  <p className="text-[10px] text-[#666] truncate">
-                                    {paper.authors.join(", ")}
-                                  </p>
-                                )}
-                              </div>
-                            </Card>
+                            <PaperCard
+                              paper={{
+                                ...paper,
+                                citations: 0,
+                                impact: "low",
+                                url: "",
+                                topics: [],
+                                category: categories.find(c => c.id === paper.category_id)
+                              }}
+                              onAddToList={async () => {
+                                const result = await addToReadingList(paper.id);
+                                if (!result.error) {
+                                  setReadingList(prev => [...prev, result.data!]);
+                                }
+                              }}
+                              onSchedule={(date, estimatedTime, repeat) => 
+                                handleSchedulePaper(paper.id, date, estimatedTime, repeat)
+                              }
+                              isLoading={isLoading}
+                            />
                           </motion.div>
                         ))}
                       </div>
@@ -496,17 +516,7 @@ export default function LibraryPage() {
         onPaperAdded={handlePaperAdded}
       />
 
-      {/* Filter/Sort Dialog */}
-      <FilterSortDialog
-        open={isFilterSortOpen}
-        onOpenChange={setIsFilterSortOpen}
-        onApply={handleFilterSort}
-        categories={categories.map(cat => ({
-          ...cat,
-          count: papers.filter(p => p.category_id === cat.id).length
-        }))}
-        selectedCategories={selectedCategories}
-      />
+      {renderFilterDialog()}
     </motion.div>
   );
 } 

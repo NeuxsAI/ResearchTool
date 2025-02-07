@@ -14,6 +14,7 @@ import { EditPaperDialog } from "@/components/library/edit-paper-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PaperCard } from "@/components/paper-card";
 
 interface Category {
   id: string;
@@ -29,15 +30,21 @@ interface Paper {
   year?: number;
   category_id?: string;
   annotations_count?: number;
-}
-
-interface RawPaper {
-  id: string;
-  title?: string;
-  authors?: string[];
-  year?: number;
-  category_id?: string;
-  annotations: { count: number } | null;
+  abstract?: string;
+  citations?: number;
+  institution?: string;
+  impact?: "high" | "low";
+  url?: string;
+  topics?: string[];
+  scheduled_date?: string;
+  estimated_time?: number;
+  category?: {
+    id: string;
+    name: string;
+    color?: string;
+  };
+  repeat?: "daily" | "weekly" | "monthly" | "none";
+  in_reading_list?: boolean;
 }
 
 export default function CategoryPage() {
@@ -79,13 +86,13 @@ export default function CategoryPage() {
         }
 
         setCategory(categoryResult.data);
-        const papers = (papersResult.data as RawPaper[] || []).map(paper => ({
+        const papers = (papersResult.data as Paper[] || []).map(paper => ({
           id: paper.id,
           title: paper.title,
           authors: paper.authors,
           year: paper.year,
           category_id: paper.category_id,
-          annotations_count: paper.annotations?.count || 0
+          annotations_count: paper.annotations_count
         }));
         setPapers(papers);
       } catch (error) {
@@ -261,7 +268,7 @@ export default function CategoryPage() {
         </div>
       ) : (
         <div className="p-6">
-          <div className="max-w-5xl">
+          <div className="w-full">
             <Tabs defaultValue="grid" className="w-full">
               <div className="flex items-center justify-between mb-4">
                 <div className="text-[11px] text-[#666]">
@@ -286,41 +293,19 @@ export default function CategoryPage() {
               <TabsContent value="grid">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {papers.map((paper) => (
-                    <Card 
-                      key={paper.id} 
-                      className="p-3 bg-[#2a2a2a] border-[#333] hover:bg-[#333] transition-colors cursor-pointer"
-                      onClick={() => handlePaperClick(paper)}
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5 text-[11px] text-[#666] mb-1">
-                          <span>{category.name}</span>
-                          <span>•</span>
-                          <span>{paper.year}</span>
-                        </div>
-                        <h3 className="text-[11px] font-medium text-[#eee] mb-1 line-clamp-2">{paper.title}</h3>
-                        <p className="text-[11px] text-[#888] truncate mb-3">{paper.authors?.join(", ") || "No authors"}</p>
-                        <div className="flex items-center justify-between pt-2 border-t border-[#333]">
-                          <div className="flex items-center gap-1">
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-6 w-6 text-[#666] hover:text-[#888] hover:bg-[#333]"
-                              onClick={(e) => handleEditClick(e, paper)}
-                            >
-                              <Pencil className="h-3 w-3" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-6 w-6 text-[#666] hover:text-[#888] hover:bg-[#333]">
-                              <MessageSquare className="h-3 w-3" />
-                              {(paper.annotations_count || 0) > 0 && (
-                                <span className="absolute top-0.5 right-0.5 text-[10px] text-[#888]">
-                                  {paper.annotations_count}
-                                </span>
-                              )}
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </Card>
+                    <PaperCard
+                      key={paper.id}
+                      paper={{
+                        ...paper,
+                        citations: 0,
+                        impact: "low",
+                        url: "",
+                        topics: [],
+                        category: category,
+                        in_reading_list: true
+                      }}
+                      onSchedule={() => {}}
+                    />
                   ))}
                 </div>
               </TabsContent>
@@ -328,32 +313,19 @@ export default function CategoryPage() {
               <TabsContent value="list">
                 <div className="space-y-2">
                   {papers.map((paper) => (
-                    <Card key={paper.id} className="p-3 bg-[#2a2a2a] border-[#333] hover:bg-[#333] transition-colors">
-                      <div className="flex items-start gap-3">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5 text-[11px] text-[#666] mb-1">
-                            <span>{category.name}</span>
-                            <span>•</span>
-                            <span>{paper.year}</span>
-                          </div>
-                          <h3 className="text-[11px] font-medium text-[#eee] mb-1 truncate">{paper.title}</h3>
-                          <p className="text-[11px] text-[#888] truncate">{paper.authors?.join(", ") || "No authors"}</p>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Button variant="ghost" size="icon" className="h-6 w-6 text-[#666] hover:text-[#888] hover:bg-[#333]">
-                            <Pencil className="h-3 w-3" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-6 w-6 text-[#666] hover:text-[#888] hover:bg-[#333]">
-                            <MessageSquare className="h-3 w-3" />
-                            {(paper.annotations_count || 0) > 0 && (
-                              <span className="absolute top-0.5 right-0.5 text-[10px] text-[#888]">
-                                {paper.annotations_count}
-                              </span>
-                            )}
-                          </Button>
-                        </div>
-                      </div>
-                    </Card>
+                    <PaperCard
+                      key={paper.id}
+                      paper={{
+                        ...paper,
+                        citations: 0,
+                        impact: "low",
+                        url: "",
+                        topics: [],
+                        category: category,
+                        in_reading_list: true
+                      }}
+                      onSchedule={() => {}}
+                    />
                   ))}
                 </div>
               </TabsContent>

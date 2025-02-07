@@ -11,11 +11,10 @@ export function Footer() {
       <div className="container relative">
         <div className="flex flex-col items-center gap-4 text-center">
           <div className="flex items-center gap-2">
-            <span className="text-lg font-medium text-white/90">nexus</span>
-            <span className="text-lg font-medium text-blue-500">mind</span>
+            <span className="text-lg font-medium bg-gradient-to-r from-blue-400 to-blue-600 text-transparent bg-clip-text">Nexus</span>
           </div>
           <p className="text-sm text-[#888]">
-            © {new Date().getFullYear()} nexusmind. All rights reserved.
+            &copy; {new Date().getFullYear()} Nexus. All rights reserved.
           </p>
         </div>
       </div>
