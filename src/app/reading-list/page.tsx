@@ -8,7 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { getReadingList, getPapers, getCategories, addToReadingList, schedulePaper, deletePaper } from "@/lib/supabase/db";
+import { getReadingList, getPapers, getCategories, addToReadingList, schedulePaper, deletePaper, updatePaper } from "@/lib/supabase/db";
 import { 
   FileText, 
   Calendar as CalendarIcon, 
@@ -33,7 +33,14 @@ import {
   Layers,
   Brain,
   Grid2x2,
-  Plus
+  Plus,
+  X,
+  MessageSquare,
+  Eye,
+  Bot,
+  Shield,
+  Heart,
+  Wand
 } from "lucide-react";
 import { format, startOfWeek, endOfWeek, isWithinInterval, setDate, addWeeks, addMonths, differenceInWeeks, differenceInMonths } from "date-fns";
 import { MainLayout } from "@/components/layout/main-layout";
@@ -165,6 +172,8 @@ export default function ReadingListPage() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [paperToDelete, setPaperToDelete] = useState<Paper | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [editingTopics, setEditingTopics] = useState<string | null>(null);
+  const [newTopic, setNewTopic] = useState("");
 
   const exampleQueries = [
     { text: "Attention mechanisms", icon: Sparkles },
@@ -491,6 +500,59 @@ export default function ReadingListPage() {
     } finally {
       setIsDeleting(false);
       setPaperToDelete(null);
+    }
+  };
+
+  const handleAddTopic = async (paperId: string) => {
+    if (!newTopic.trim()) return;
+    
+    try {
+      const paperToUpdate = papers.find(p => p.id === paperId);
+      if (!paperToUpdate) return;
+
+      const updatedTopics = [...(paperToUpdate.topics || []), newTopic.trim()];
+      
+      // Update paper
+      await updatePaper(paperId, {
+        ...paperToUpdate,
+        topics: updatedTopics
+      });
+
+      // Update local state
+      setPapers(prevPapers => prevPapers.map(p => 
+        p.id === paperId ? { ...p, topics: updatedTopics } : p
+      ));
+      
+      setNewTopic("");
+      toast.success("Topic added");
+    } catch (error) {
+      console.error("Error adding topic:", error);
+      toast.error("Failed to add topic");
+    }
+  };
+
+  const handleRemoveTopic = async (paperId: string, topicToRemove: string) => {
+    try {
+      const paperToUpdate = papers.find(p => p.id === paperId);
+      if (!paperToUpdate) return;
+
+      const updatedTopics = paperToUpdate.topics?.filter(t => t !== topicToRemove) || [];
+      
+      // Update paper
+      await updatePaper(paperId, {
+        ...paperToUpdate,
+        topics: updatedTopics
+      });
+
+      // Update local state
+      setPapers(prevPapers => prevPapers.map(p => 
+        p.id === paperId ? { ...p, topics: updatedTopics } : p
+      ));
+      
+      toast.success("Topic removed");
+    } catch (error) {
+      console.error("Error removing topic:", error);
+      toast.error("Failed to remove topic");
     }
   };
 
@@ -1011,42 +1073,117 @@ export default function ReadingListPage() {
                   </div>
 
                   <div>
-                    <div className="flex items-center gap-2 mb-3">
-                      <Tags className="h-3.5 w-3.5 text-violet-500" />
-                      <h4 className="text-xs font-medium text-white">Topics</h4>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <Tags className="h-3.5 w-3.5 text-violet-500" />
+                        <h4 className="text-xs font-medium text-white">Topics</h4>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setEditingTopics(editingTopics ? null : "new")}
+                        className="h-6 px-2 text-[10px] hover:bg-[#2a2a2a] text-violet-500"
+                      >
+                        {editingTopics ? "Done" : "Edit"}
+                      </Button>
                     </div>
-                    <div className="space-y-1">
-                      {[
-                        { value: "machine-learning", label: "Machine Learning", color: "bg-blue-500" },
-                        { value: "computer-vision", label: "Computer Vision", color: "bg-green-500" },
-                        { value: "nlp", label: "Natural Language Processing", color: "bg-violet-500" },
-                        { value: "reinforcement-learning", label: "Reinforcement Learning", color: "bg-amber-500" }
-                      ].map(({ value, label, color }) => (
-                        <Button
-                          key={value}
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedTopics(prev => 
-                              prev.includes(value) 
-                                ? prev.filter(t => t !== value)
-                                : [...prev, value]
-                            )
-                          }}
-                          className={cn(
-                            "w-full justify-start h-7 text-[11px] group",
-                            selectedTopics.includes(value)
-                              ? "bg-[#2a2a2a] text-white"
-                              : "text-[#888] hover:bg-[#2a2a2a]"
-                          )}
-                        >
-                          <div className={cn(
-                            "w-1.5 h-1.5 rounded-full mr-2",
-                            selectedTopics.includes(value) ? color : "bg-[#666]"
-                          )} />
-                          {label}
-                        </Button>
-                      ))}
+                    <div className="space-y-2">
+                      {/* Topic Input when editing */}
+                      {editingTopics === "new" && (
+                        <div className="flex gap-1.5 mb-2">
+                          <Input
+                            value={newTopic}
+                            onChange={(e) => setNewTopic(e.target.value)}
+                            placeholder="Add custom topic..."
+                            className="h-7 text-[11px] bg-[#2a2a2a] border-[#333] focus:ring-0 focus:border-violet-500/50"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && newTopic.trim()) {
+                                setSelectedTopics(prev => [...prev, newTopic.trim()]);
+                                setNewTopic("");
+                              }
+                            }}
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              if (newTopic.trim()) {
+                                setSelectedTopics(prev => [...prev, newTopic.trim()]);
+                                setNewTopic("");
+                              }
+                            }}
+                            disabled={!newTopic.trim()}
+                            className="h-7 px-2 hover:bg-[#333]"
+                          >
+                            <Plus className="h-3.5 w-3.5 text-violet-500" />
+                          </Button>
+                        </div>
+                      )}
+                      
+                      {/* Predefined Topics */}
+                      <div className="space-y-1 mb-3">
+                        {[
+                          { value: "machine-learning", label: "Machine Learning", icon: Brain },
+                          { value: "deep-learning", label: "Deep Learning", icon: Layers },
+                          { value: "nlp", label: "Natural Language Processing", icon: MessageSquare },
+                          { value: "computer-vision", label: "Computer Vision", icon: Eye },
+                          { value: "reinforcement-learning", label: "Reinforcement Learning", icon: Zap },
+                          { value: "transformers", label: "Transformers", icon: Sparkles },
+                          { value: "robotics", label: "Robotics", icon: Bot },
+                          { value: "ai-safety", label: "AI Safety", icon: Shield },
+                          { value: "ethics", label: "AI Ethics", icon: Heart },
+                          { value: "generative-ai", label: "Generative AI", icon: Wand }
+                        ].map(({ value, label, icon: Icon }) => (
+                          <Button
+                            key={value}
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              if (!selectedTopics.includes(value)) {
+                                setSelectedTopics(prev => [...prev, value]);
+                              }
+                            }}
+                            className={cn(
+                              "w-full justify-start h-7 text-[11px] group",
+                              selectedTopics.includes(value)
+                                ? "bg-[#2a2a2a] text-white"
+                                : "text-[#888] hover:bg-[#2a2a2a]"
+                            )}
+                          >
+                            <Icon className={cn(
+                              "h-3.5 w-3.5 mr-2",
+                              selectedTopics.includes(value)
+                                ? "text-violet-500"
+                                : "text-[#666] group-hover:text-[#888]"
+                            )} />
+                            {label}
+                          </Button>
+                        ))}
+                      </div>
+
+                      {/* Selected Topics */}
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedTopics.map((topic) => (
+                          <Badge 
+                            key={topic}
+                            variant="secondary" 
+                            className={cn(
+                              "bg-[#2a2a2a] text-[11px] px-2 py-0.5 text-white",
+                              editingTopics && "pr-6 relative group"
+                            )}
+                          >
+                            {topic}
+                            {editingTopics && (
+                              <button
+                                onClick={() => setSelectedTopics(prev => prev.filter(t => t !== topic))}
+                                className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                <X className="h-3 w-3 text-[#666] hover:text-[#888]" />
+                              </button>
+                            )}
+                          </Badge>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1136,36 +1273,45 @@ export default function ReadingListPage() {
                     </div>
                   ) : (
                     <motion.div 
-                      className="space-y-4 pb-4"
+                      className="flex-1 min-h-0 overflow-y-auto"
                       variants={containerVariants}
                       initial="hidden"
                       animate="visible"
                     >
-                      {searchResults.map((paper) => (
-                        <motion.div key={paper.id} variants={itemVariants}>
-                          <PaperCard
-                            paper={{
-                              ...paper,
-                              citations: paper.citations || 0,
-                              impact: paper.impact || "low",
-                              url: paper.url || "",
-                              topics: paper.topics || [],
-                              in_reading_list: readingList.some(item => item.paper_id === paper.id),
-                              scheduled_date: paper.scheduled_date,
-                              estimated_time: paper.estimated_time,
-                              repeat: paper.repeat
-                            }}
-                            onDelete={() => handleDeletePaper(paper)}
-                            onAddToList={() => handleAddToList(paper)}
-                            onSchedule={(date, time, repeat) => handleSchedulePaper(paper, date, time, repeat)}
-                            isLoading={isLoading}
-                            variant="compact"
-                            context="discover"
-                            showScheduleButton={!paper.in_reading_list}
-                            showAddToListButton={!paper.in_reading_list}
-                          />
-                        </motion.div>
-                      ))}
+                      <div className="space-y-4 p-4">
+                        {searchResults.map((paper) => (
+                          <motion.div key={paper.id} variants={itemVariants}>
+                            <PaperCard
+                              paper={{
+                                ...paper,
+                                citations: paper.citations || 0,
+                                impact: paper.impact || "low",
+                                url: paper.url || "",
+                                topics: paper.topics || [],
+                                in_reading_list: readingList.some(item => item.paper_id === paper.id),
+                                scheduled_date: paper.scheduled_date,
+                                estimated_time: paper.estimated_time,
+                                repeat: paper.repeat
+                              }}
+                              onDelete={() => handleDeletePaper(paper)}
+                              onAddToList={() => handleAddToList(paper)}
+                              onSchedule={(date, time, repeat) => handleSchedulePaper(paper, date, time, repeat)}
+                              isLoading={isLoading}
+                              variant="compact"
+                              context="discover"
+                              showScheduleButton={!paper.in_reading_list}
+                              showAddToListButton={!paper.in_reading_list}
+                              onAddTopic={(topic) => handleAddTopic(paper.id)}
+                              onRemoveTopic={(topic) => handleRemoveTopic(paper.id, topic)}
+                              isEditingTopics={editingTopics === paper.id}
+                              onEditTopics={() => setEditingTopics(paper.id)}
+                              onStopEditingTopics={() => setEditingTopics(null)}
+                              newTopic={editingTopics === paper.id ? newTopic : ""}
+                              onNewTopicChange={(value) => setNewTopic(value)}
+                            />
+                          </motion.div>
+                        ))}
+                      </div>
                     </motion.div>
                   )}
                 </div>

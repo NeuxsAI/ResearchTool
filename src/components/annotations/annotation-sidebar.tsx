@@ -8,11 +8,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChatView } from "./chat-view";
 
 interface ChatMessage {
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "system";
   content: string;
   timestamp: string;
   annotationId?: string;
   highlightText?: string;
+  isStreaming?: boolean;
 }
 
 interface AnnotationSidebarProps {

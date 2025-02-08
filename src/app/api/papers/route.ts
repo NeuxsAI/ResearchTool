@@ -78,7 +78,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Get the PDF URL - either from file upload or direct URL
+    // Get the PDF URL
     let pdfUrl: string;
     if (file) {
       console.log('Uploading file:', file.name, file.size);
@@ -135,6 +135,26 @@ export async function POST(request: Request) {
         { error: 'Failed to create paper: No data returned' },
         { status: 500 }
       );
+    }
+
+    // Index paper in RAG service
+    try {
+      const ragResponse = await fetch(`${process.env.NEXT_PUBLIC_RAG_API_URL}/papers/${paper.id}/index-pdf`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          pdf_url: pdfUrl
+        })
+      });
+
+      if (!ragResponse.ok) {
+        const error = await ragResponse.text();
+        console.error('Failed to index paper in RAG service:', error);
+      }
+    } catch (ragError) {
+      console.error('Error indexing paper in RAG:', ragError);
     }
 
     console.log('Paper created successfully:', paper);
