@@ -43,6 +43,7 @@ import { cn } from "@/lib/utils";
 import { Paper } from "@/lib/types";
 import { PaperCard, PaperCardSkeleton } from "@/components/paper-card";
 import { SelectSingleEventHandler } from "react-day-picker";
+import { cache, CACHE_KEYS } from '@/lib/cache';
 
 // Interface for Supabase data
 interface SupabasePaper {
@@ -97,6 +98,49 @@ const loadingVariants = {
     }
   }
 };
+
+// Preload function for parallel data fetching
+async function preloadData() {
+  const [papersResult, readingListResult, categoriesResult] = await Promise.all([
+    getPapers(),
+    getReadingList(),
+    getCategories()
+  ]);
+
+  // Process and combine data
+  const papers = (papersResult.data || []).map(p => {
+    const readingListItem = readingListResult.data?.find(r => r.paper_id === p.id);
+    const category = categoriesResult.data?.find(c => c.id === p.category_id);
+    
+    return {
+      id: p.id,
+      title: p.title || "",
+      abstract: p.abstract,
+      authors: p.authors || [],
+      year: p.year || new Date().getFullYear(),
+      citations: 0,
+      impact: "low" as const,
+      url: p.url || "",
+      topics: [],
+      category_id: p.category_id,
+      category: category ? {
+        id: category.id,
+        name: category.name,
+        color: category.color
+      } : undefined,
+      scheduled_date: readingListItem?.scheduled_date,
+      estimated_time: readingListItem?.estimated_time,
+      repeat: readingListItem?.repeat,
+      in_reading_list: Boolean(readingListItem)
+    };
+  });
+
+  return {
+    papers,
+    readingList: readingListResult.data || [],
+    categories: categoriesResult.data || []
+  };
+}
 
 export default function ReadingListPage() {
   const router = useRouter();
@@ -187,85 +231,32 @@ export default function ReadingListPage() {
   };
 
   useEffect(() => {
+    let mounted = true;
+
     async function loadData() {
       try {
         setIsLoading(true);
-        const [papersResult, readingListResult, categoriesResult] = await Promise.all([
-          getPapers(),
-          getReadingList(),
-          getCategories()
-        ]);
-
-        // First map to base Paper interface
-        const basePapers: Paper[] = (papersResult.data || [])
-          .filter((paper: SupabasePaper) => 
-            Boolean(paper.id && paper.title && paper.authors)
-          )
-          .map(paper => {
-            const category = categoriesResult.data?.find(c => c.id === paper.category_id);
-            return {
-              id: paper.id!,
-              title: paper.title!,
-              abstract: paper.abstract,
-              authors: paper.authors!,
-              year: paper.year || new Date().getFullYear(),
-              citations: 0,
-              impact: "low" as const,
-              url: paper.url || `https://example.com/paper/${paper.id}`,
-              topics: [],
-              category_id: paper.category_id,
-              category: category ? {
-                id: category.id,
-                name: category.name,
-                color: category.color
-              } : undefined
-            };
-          });
-
-        // Then extend with reading list properties
-        const readingListPapers: Paper[] = basePapers.map(paper => ({
-          ...paper,
-          scheduled_date: undefined,
-          estimated_time: undefined
-        }));
-
-        // Update papers with reading list information
-        const updatedPapers = (papersResult.data || []).map(p => {
-          const readingListItem = readingListResult.data?.find(r => r.paper_id === p.id);
-          const category = categoriesResult.data?.find(c => c.id === p.category_id);
-          
-          return {
-            id: p.id,
-            title: p.title || "",
-            abstract: p.abstract,
-            authors: p.authors || [],
-            year: p.year || new Date().getFullYear(),
-            citations: 0,
-            impact: "low" as const,
-            url: p.url || `https://example.com/paper/${p.id}`,
-            topics: [],
-            category_id: p.category_id,
-            category: category ? {
-              id: category.id,
-              name: category.name,
-              color: category.color
-            } : undefined,
-            scheduled_date: readingListItem?.scheduled_date,
-            estimated_time: readingListItem?.estimated_time,
-            repeat: readingListItem?.repeat,
-            in_reading_list: Boolean(readingListItem)
-          } as Paper;
-        });
-
-        setPapers(updatedPapers);
-        setReadingList(readingListResult.data || []);
+        
+        const { papers: loadedPapers, readingList: loadedReadingList } = await preloadData();
+        
+        if (!mounted) return;
+        
+        setPapers(loadedPapers);
+        setReadingList(loadedReadingList);
       } catch (error) {
         console.error("Error loading data:", error);
       } finally {
-        setIsLoading(false);
+        if (mounted) {
+          setIsLoading(false);
+        }
       }
     }
+
     loadData();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const handlePaperClick = (paper: Paper) => {

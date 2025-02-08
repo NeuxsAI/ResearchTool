@@ -60,6 +60,21 @@ const itemVariants = {
   }
 };
 
+// Preload function for parallel data fetching
+async function preloadData() {
+  const [papersResult, readingListResult, categoriesResult] = await Promise.all([
+    getPapers(),
+    getReadingList(),
+    getCategories()
+  ]);
+
+  return {
+    papers: papersResult.data || [],
+    readingList: readingListResult.data || [],
+    categories: categoriesResult.data || []
+  };
+}
+
 export default function LibraryPage() {
   const router = useRouter();
   const { categories, isLoading: isCategoriesLoading } = useCategories();
@@ -75,66 +90,49 @@ export default function LibraryPage() {
   const [showAllCategories, setShowAllCategories] = useState(false);
   const [filterDialogOpen, setFilterDialogOpen] = useState(false);
 
-  // Fetch data
+  // Optimized data loading
   useEffect(() => {
+    let mounted = true;
+
     async function loadData() {
       try {
         setIsLoading(true);
         
-        // First fetch papers, categories, and reading list
-        console.log("Fetching initial data...");
-        const [papersResult, readingListResult] = await Promise.all([
-          getPapers(),
-          getReadingList()
-        ]);
-
-        if (papersResult.error) {
-          console.error("Error fetching papers:", papersResult.error);
-          return;
-        }
-        if (readingListResult.error) {
-          console.error("Error fetching reading list:", readingListResult.error);
-          return;
-        }
-
-        setPapers(papersResult.data || []);
-        setReadingList(readingListResult.data || []);
-
-        // Get recent annotations
-        console.log("Fetching annotations...");
-        const allPapers = papersResult.data || [];
-        console.log("Fetching annotations for all papers:", allPapers.length);
+        const { papers, readingList, categories } = await preloadData();
         
-        try {
-          const annotationsPromises = allPapers.map(paper => 
-            getAnnotationsByPaper(paper.id)
-          );
-          const annotationsResults = await Promise.all(annotationsPromises);
-          
-          // Check for errors in annotation results
-          const annotationErrors = annotationsResults.filter(result => result.error);
-          if (annotationErrors.length > 0) {
-            console.error("Errors fetching annotations:", annotationErrors);
-          }
+        if (!mounted) return;
 
-          const allAnnotations = annotationsResults
-            .flatMap(result => result.data || [])
-            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-            .slice(0, 5);
-          
-          console.log("Fetched annotations:", allAnnotations);
-          setRecentAnnotations(allAnnotations);
-        } catch (annotationError) {
-          console.error("Error fetching annotations:", annotationError);
-          setRecentAnnotations([]);
-        }
+        // Set initial data
+        setPapers(papers);
+        setReadingList(readingList);
+
+        // Load annotations in parallel for all papers
+        const annotationsPromises = papers.map(paper => getAnnotationsByPaper(paper.id));
+        const annotationsResults = await Promise.all(annotationsPromises);
+        
+        if (!mounted) return;
+
+        const allAnnotations = annotationsResults
+          .filter(result => !result.error)
+          .flatMap(result => result.data || [])
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+          .slice(0, 5);
+
+        setRecentAnnotations(allAnnotations);
       } catch (error) {
         console.error("Error in loadData:", error);
       } finally {
-        setIsLoading(false);
+        if (mounted) {
+          setIsLoading(false);
+        }
       }
     }
+
     loadData();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   // Filter and sort papers

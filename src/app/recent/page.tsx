@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PaperCard } from "@/components/paper-card";
+import { cache, CACHE_KEYS } from '@/lib/cache';
 
 interface Paper {
   id: string;
@@ -57,6 +58,34 @@ const itemVariants = {
   }
 };
 
+// Preload function for parallel data fetching
+async function preloadData() {
+  const [papersResult, categoriesResult] = await Promise.all([
+    getPapers(),
+    getCategories()
+  ]);
+
+  // Sort and process papers
+  const sortedPapers = (papersResult.data || [])
+    .map(paper => {
+      const category = categoriesResult.data?.find(c => c.id === paper.category_id);
+      return {
+        ...paper,
+        category: category?.name,
+        category_color: category?.color
+      };
+    })
+    .sort((a, b) => {
+      const aDate = new Date(a.updated_at || a.created_at || "").getTime();
+      const bDate = new Date(b.updated_at || b.created_at || "").getTime();
+      return bDate - aDate;
+    })
+    .slice(0, 10);
+
+  cache.set(CACHE_KEYS.RECENT_PAPERS, sortedPapers);
+  return { papers: sortedPapers, categories: categoriesResult.data };
+}
+
 export default function RecentPage() {
   const router = useRouter();
   const [isAddPaperOpen, setIsAddPaperOpen] = useState(false);
@@ -64,40 +93,38 @@ export default function RecentPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    let mounted = true;
+
     async function loadPapers() {
       try {
         setIsLoading(true);
-        const { data: papers, error } = await getPapers();
-        const { data: categories } = await getCategories();
         
-        if (error) throw error;
-        
-        // Sort by most recently updated/created and take the last 10
-        const sortedPapers = (papers || [])
-          .map(paper => {
-            const category = categories?.find(c => c.id === paper.category_id);
-            return {
-              ...paper,
-              category: category?.name,
-              category_color: category?.color
-            };
-          })
-          .sort((a, b) => {
-            const aDate = new Date(a.updated_at || a.created_at || "").getTime();
-            const bDate = new Date(b.updated_at || b.created_at || "").getTime();
-            return bDate - aDate;
-          })
-          .slice(0, 10);
-        
-        setRecentPapers(sortedPapers);
+        // Try to get from cache first
+        const cachedPapers = cache.get(CACHE_KEYS.RECENT_PAPERS);
+        if (cachedPapers && mounted) {
+          setRecentPapers(cachedPapers);
+          setIsLoading(false);
+          return;
+        }
+
+        const { papers } = await preloadData();
+        if (mounted) {
+          setRecentPapers(papers);
+        }
       } catch (error) {
         console.error("Error loading recent papers:", error);
       } finally {
-        setIsLoading(false);
+        if (mounted) {
+          setIsLoading(false);
+        }
       }
     }
     
     loadPapers();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const handlePaperClick = (paper: Paper) => {

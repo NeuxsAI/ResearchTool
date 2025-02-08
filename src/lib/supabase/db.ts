@@ -1,18 +1,27 @@
 import { createClient as createServerClient } from './server'
 import { createClient as createBrowserClient } from './client'
 import type { Category, Paper, Annotation, Board, BoardItem, ReadingListItem, DbResult, DbArrayResult, DiscoveredPaper } from '@/lib/supabase/types'
+import { cache, CACHE_KEYS } from '../cache'
 
 // Categories
 export async function getCategories(): Promise<DbArrayResult<Category>> {
+  const cachedCategories = cache.get(CACHE_KEYS.CATEGORIES)
+  if (cachedCategories) return { data: cachedCategories, error: null }
+  
   const supabase = createBrowserClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { data: [], error: null }
   
-  return await supabase
+  const result = await supabase
     .from('categories')
     .select('*')
     .eq('user_id', user.id)
     .order('name')
+  
+  if (!result.error) {
+    cache.set(CACHE_KEYS.CATEGORIES, result.data)
+  }
+  return result
 }
 
 export async function getCategoryById(id: string): Promise<DbResult<Category>> {
@@ -61,15 +70,23 @@ export async function deleteCategory(id: string): Promise<DbResult<Category>> {
 
 // Papers
 export const getPapers = async (): Promise<DbArrayResult<Paper>> => {
+  const cachedPapers = cache.get(CACHE_KEYS.PAPERS)
+  if (cachedPapers) return { data: cachedPapers, error: null }
+  
   const supabase = createBrowserClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { data: [], error: null }
   
-  return await supabase
+  const result = await supabase
     .from('papers')
     .select('*')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
+  
+  if (!result.error) {
+    cache.set(CACHE_KEYS.PAPERS, result.data)
+  }
+  return result
 }
 
 export async function getPapersByCategory(categoryId: string): Promise<DbArrayResult<Paper>> {
@@ -213,6 +230,10 @@ export async function deletePaper(id: string, token?: string): Promise<DbResult<
 
 // Annotations
 export async function getAnnotationsByPaper(paperId: string): Promise<DbArrayResult<Annotation>> {
+  const cacheKey = CACHE_KEYS.ANNOTATIONS(paperId)
+  const cachedAnnotations = cache.get(cacheKey)
+  if (cachedAnnotations) return { data: cachedAnnotations, error: null }
+  
   const supabase = createBrowserClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { data: [], error: null }
@@ -226,6 +247,9 @@ export async function getAnnotationsByPaper(paperId: string): Promise<DbArrayRes
     .order('created_at', { ascending: false });
   
   console.log("Annotations result:", result);
+  if (!result.error) {
+    cache.set(cacheKey, result.data)
+  }
   return result;
 }
 
@@ -379,15 +403,23 @@ export async function deleteBoardItem(id: string): Promise<DbResult<BoardItem>> 
 
 // Reading List
 export const getReadingList = async (): Promise<DbArrayResult<ReadingListItem>> => {
+  const cachedReadingList = cache.get(CACHE_KEYS.READING_LIST)
+  if (cachedReadingList) return { data: cachedReadingList, error: null }
+  
   const supabase = createBrowserClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { data: [], error: null }
   
-  return await supabase
+  const result = await supabase
     .from('reading_list')
     .select('*')
     .eq('user_id', user.id)
     .order('added_at', { ascending: false })
+  
+  if (!result.error) {
+    cache.set(CACHE_KEYS.READING_LIST, result.data)
+  }
+  return result
 }
 
 export async function addToReadingList(paperId: string, paperData?: Partial<Paper>): Promise<DbResult<ReadingListItem>> {
@@ -462,6 +494,11 @@ export async function addToReadingList(paperId: string, paperData?: Partial<Pape
     return { data: null, error };
   }
 
+  if (!error) {
+    cache.invalidate(CACHE_KEYS.READING_LIST);
+    cache.invalidate(CACHE_KEYS.PAPERS);
+  }
+
   return { data, error: null };
 }
 
@@ -491,7 +528,7 @@ export async function schedulePaper(
 
   if (existingItem) {
     // Update existing reading list item
-    return await supabase
+    const result = await supabase
       .from('reading_list')
       .update({
         scheduled_date: scheduledDate.toISOString().split('T')[0],
@@ -503,9 +540,15 @@ export async function schedulePaper(
       .eq('user_id', user.id)
       .select()
       .single();
+
+    if (!result.error) {
+      cache.invalidate(CACHE_KEYS.READING_LIST);
+      cache.invalidate(CACHE_KEYS.PAPERS);
+    }
+    return result;
   } else {
     // Create new reading list item
-    return await supabase
+    const result = await supabase
       .from('reading_list')
       .insert({
         paper_id: paperId,
@@ -518,6 +561,12 @@ export async function schedulePaper(
       })
       .select()
       .single();
+
+    if (!result.error) {
+      cache.invalidate(CACHE_KEYS.READING_LIST);
+      cache.invalidate(CACHE_KEYS.PAPERS);
+    }
+    return result;
   }
 }
 

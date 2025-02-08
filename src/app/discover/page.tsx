@@ -13,6 +13,34 @@ import { Paper } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence } from "framer-motion";
 import { addToReadingList } from "@/lib/supabase/db";
+import { cache, CACHE_KEYS } from '@/lib/cache';
+
+// Preload function for parallel data fetching
+async function preloadPapers(refresh = false) {
+  const cachedRecommended = !refresh && cache.get(CACHE_KEYS.RECOMMENDED_PAPERS);
+  const cachedTrending = !refresh && cache.get(CACHE_KEYS.TRENDING_PAPERS);
+
+  const [recommendedResponse, trendingResponse] = await Promise.all([
+    cachedRecommended ? 
+      { ok: true, papers: cachedRecommended } : 
+      fetch(`/api/papers/discover${refresh ? '?refresh=true' : ''}`).then(r => r.json()),
+    cachedTrending ? 
+      { ok: true, papers: cachedTrending } : 
+      fetch(`/api/papers/trending${refresh ? '?refresh=true' : ''}`).then(r => r.json())
+  ]);
+
+  if (recommendedResponse.papers) {
+    cache.set(CACHE_KEYS.RECOMMENDED_PAPERS, recommendedResponse.papers);
+  }
+  if (trendingResponse.papers) {
+    cache.set(CACHE_KEYS.TRENDING_PAPERS, trendingResponse.papers);
+  }
+
+  return {
+    recommended: recommendedResponse.papers || [],
+    trending: trendingResponse.papers || []
+  };
+}
 
 export default function DiscoverPage() {
   const [papers, setPapers] = useState<Paper[]>([]);
@@ -30,28 +58,9 @@ export default function DiscoverPage() {
       if (refresh) setIsRefreshing(true);
       else setIsLoading(true);
 
-      // Load recommended papers first
-      const recommendedResponse = await fetch(`/api/papers/discover${refresh ? '?refresh=true' : ''}`);
-      const recommendedData = await recommendedResponse.json();
-      
-      if (!recommendedResponse.ok) {
-        console.error('Error loading recommended papers:', recommendedData.error);
-        toast.error(recommendedData.error || 'Failed to load recommended papers');
-      } else {
-        setPapers(recommendedData.papers || []);
-      }
-
-      // Then load trending papers
-      const trendingResponse = await fetch(`/api/papers/trending${refresh ? '?refresh=true' : ''}`);
-      const trendingData = await trendingResponse.json();
-      
-      if (!trendingResponse.ok) {
-        console.error('Error loading trending papers:', trendingData.error);
-        toast.error(trendingData.error || 'Failed to load trending papers');
-      } else {
-        setTrendingPapers(trendingData.papers || []);
-      }
-
+      const { recommended, trending } = await preloadPapers(refresh);
+      setPapers(recommended);
+      setTrendingPapers(trending);
     } catch (error) {
       console.error('Error loading papers:', error);
       toast.error('Failed to load papers');
@@ -62,7 +71,6 @@ export default function DiscoverPage() {
   };
 
   useEffect(() => {
-    // Only load cached data on mount
     loadPapers(false);
   }, []);
 
