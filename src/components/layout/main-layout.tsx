@@ -24,33 +24,42 @@ import { ProfileMenu } from "@/components/auth/profile-menu";
 import { useUser } from "@/lib/context/user-context";
 import { useCategories } from "@/lib/context/categories-context";
 import { DeleteCategoryDialog } from "@/components/library/delete-category-dialog";
+import type { Category } from "@/lib/supabase/types";
 
 interface MainLayoutProps {
   children: React.ReactNode;
 }
 
-const gradients = [
-  'from-blue-500 to-purple-500',
-  'from-green-500 to-blue-500',
-  'from-yellow-500 to-red-500',
-  'from-pink-500 to-purple-500',
-  'from-indigo-500 to-blue-500',
-  'from-red-500 to-pink-500',
-  'from-purple-500 to-indigo-500',
-  'from-orange-500 to-red-500',
-  'from-teal-500 to-green-500',
-  'from-cyan-500 to-blue-500',
-];
-
 export function MainLayout({ children }: MainLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, isLoading: isUserLoading } = useUser();
-  const { categories, isLoading: isLoadingCategories, refreshCategories } = useCategories();
+  const categoriesContext = useCategories();
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!isUserLoading && !user) {
+      router.push('/login');
+    }
+  }, [isUserLoading, user, router]);
 
   const handleNavigation = (path: string) => {
     router.push(path);
   };
+
+  // Show loading state while checking auth
+  if (isUserLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-[#1c1c1c]">
+        <div className="text-[#888]">Loading...</div>
+      </div>
+    );
+  }
+
+  // Don't render anything if not authenticated
+  if (!user) {
+    return null;
+  }
 
   return (
     <div className="flex h-screen bg-[#1c1c1c]">
@@ -126,7 +135,7 @@ export function MainLayout({ children }: MainLayoutProps) {
               <div className="px-2 py-1">
                 <span className="text-[11px] font-medium text-[#666]">My library</span>
               </div>
-              {categories.map((category, index) => (
+              {!categoriesContext?.isLoading && categoriesContext?.categories?.map((category: Category, index: number) => (
                 <div key={category.id} className="group flex items-center">
                   <Button
                     variant={pathname === routes.category.view(category.id) ? "secondary" : "ghost"}
@@ -137,13 +146,21 @@ export function MainLayout({ children }: MainLayoutProps) {
                     onClick={() => handleNavigation(routes.category.view(category.id))}
                   >
                     <div className="flex items-center">
-                      <div className={`w-1.5 h-1.5 rounded-full bg-gradient-to-br ${gradients[index % gradients.length]} mr-2`} />
+                      <div 
+                        className="w-1.5 h-1.5 rounded-full mr-2" 
+                        style={{ backgroundColor: category.color || '#666' }}
+                      />
                       <span>{category.name}</span>
                     </div>
                   </Button>
                   <DeleteCategoryDialog categoryId={category.id} categoryName={category.name} />
                 </div>
               ))}
+              {categoriesContext?.isLoading && (
+                <div className="px-4 py-2">
+                  <span className="text-[11px] text-[#666]">Loading categories...</span>
+                </div>
+              )}
             </div>
           </div>
         </div>

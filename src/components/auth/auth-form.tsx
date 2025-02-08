@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client"
 import { Github, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { useRouter } from 'next/navigation'
-
+import { useSearchParams } from 'next/navigation'
 
 export function AuthForm() {
   const [isLoading, setIsLoading] = useState(false)
@@ -15,7 +15,8 @@ export function AuthForm() {
   const [email, setEmail] = useState("")
   const supabase = createClient()
   const router = useRouter()
-
+  const searchParams = useSearchParams()
+  const redirectTo = searchParams.get('redirectTo') || '/main'
 
   async function signInWithGithub() {
     try {
@@ -23,7 +24,7 @@ export function AuthForm() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "github",
         options: {
-          redirectTo: `${location.origin}/auth/callback`,
+          redirectTo: `${location.origin}/auth/callback?redirectTo=${encodeURIComponent(redirectTo)}`,
           scopes: 'read:user user:email',
         },
       })
@@ -48,7 +49,7 @@ export function AuthForm() {
       
       if (error) throw error
       toast.success("Signed in successfully!")
-      router.push('/main')
+      router.push(redirectTo)
       router.refresh() // Force a refresh of the page data
     } catch (error) {
       toast.error("Failed to sign in")

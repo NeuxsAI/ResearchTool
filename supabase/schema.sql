@@ -65,6 +65,22 @@ create table if not exists reading_list (
   unique(user_id, paper_id)
 );
 
+create table if not exists discovered_papers (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  authors text[] not null,
+  abstract text,
+  year integer,
+  url text,
+  citations integer default 0,
+  impact text check (impact in ('high', 'low')),
+  topics text[],
+  source text not null,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  metadata jsonb,
+  user_id uuid references auth.users(id) on delete cascade not null
+);
+
 -- Create indexes
 create index if not exists papers_category_id_idx on papers(category_id);
 create index if not exists annotations_paper_id_idx on annotations(paper_id);
@@ -72,6 +88,7 @@ create index if not exists board_items_board_id_idx on board_items(board_id);
 create index if not exists board_items_paper_id_idx on board_items(paper_id);
 create index if not exists reading_list_paper_id_idx on reading_list(paper_id);
 create index if not exists reading_list_user_paper_idx on reading_list(user_id, paper_id);
+create index if not exists discovered_papers_user_id_idx on discovered_papers(user_id);
 
 -- Enable Row Level Security (RLS)
 alter table categories enable row level security;
@@ -80,6 +97,7 @@ alter table annotations enable row level security;
 alter table boards enable row level security;
 alter table board_items enable row level security;
 alter table reading_list enable row level security;
+alter table discovered_papers enable row level security;
 
 -- Create RLS policies
 create policy "Users can view their own categories"
@@ -128,4 +146,21 @@ $$ language plpgsql security definer;
 -- Create triggers
 create trigger on_auth_user_created
   after insert on auth.users
-  for each row execute procedure public.handle_new_user(); 
+  for each row execute procedure public.handle_new_user();
+
+-- Discovered papers policies
+create policy "Users can view their own discovered papers"
+  on discovered_papers for select
+  using (auth.uid() = user_id);
+
+create policy "Users can insert their own discovered papers"
+  on discovered_papers for insert
+  with check (auth.uid() = user_id);
+
+create policy "Users can update their own discovered papers"
+  on discovered_papers for update
+  using (auth.uid() = user_id);
+
+create policy "Users can delete their own discovered papers"
+  on discovered_papers for delete
+  using (auth.uid() = user_id); 

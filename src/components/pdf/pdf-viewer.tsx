@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
+import { LoadingOverlay } from "@/components/ui/loading-overlay"
+
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
@@ -71,13 +73,10 @@ export function PDFViewer({ url, onSelection, annotations = [] }: PDFViewerProps
         pdfRef.current = pdf;
         setNumPages(pdf.numPages);
         setIsLoading(false);
-        console.log('PDF loaded, pages:', pdf.numPages);
 
         // Load and render each page
         for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
           if (!mounted) break;
-          
-          console.log('Rendering page:', pageNum);
           const page = await pdf.getPage(pageNum);
           pageRefs.current.set(pageNum, page);
           await renderPage(page, pageNum);
@@ -96,7 +95,6 @@ export function PDFViewer({ url, onSelection, annotations = [] }: PDFViewerProps
       // Setup canvas
       const canvas = document.getElementById(`page-${pageNum}`) as HTMLCanvasElement;
       if (!canvas) {
-        console.error('Canvas not found for page:', pageNum);
         return;
       }
 
@@ -132,6 +130,7 @@ export function PDFViewer({ url, onSelection, annotations = [] }: PDFViewerProps
       // Set text layer dimensions
       textLayerDiv.style.width = `${Math.floor(viewport.width)}px`;
       textLayerDiv.style.height = `${Math.floor(viewport.height)}px`;
+      textLayerDiv.style.setProperty('--scale-factor', scale.toString());
 
       // Get text content
       const textContent = await page.getTextContent();
@@ -245,27 +244,24 @@ export function PDFViewer({ url, onSelection, annotations = [] }: PDFViewerProps
   };
 
   return (
-    <div className="flex flex-col items-center p-4 overflow-auto bg-[#1c1c1c] min-h-full">
-      {isLoading ? (
-        <div className="text-white">Loading PDF...</div>
-      ) : (
-        Array.from({ length: numPages }, (_, i) => i + 1).map((pageNum) => (
-          <div 
-            key={pageNum} 
-            className="relative mb-4 select-none" 
-            onMouseUp={handleTextSelection}
-          >
-            <canvas
-              id={`page-${pageNum}`}
-              className="bg-white shadow-lg"
-            />
-            <div
-              id={`text-layer-${pageNum}`}
-              className="absolute top-0 left-0 text-layer select-text"
-            />
-          </div>
-        ))
-      )}
-    </div>
-  );
+    <div className="relative flex flex-col items-center p-4 overflow-auto bg-[#1c1c1c] min-h-full">
+    {isLoading && <LoadingOverlay message="Processing PDF..." />}
+    {!isLoading && Array.from({ length: numPages }, (_, i) => i + 1).map((pageNum) => (
+      <div 
+        key={pageNum} 
+        className="relative mb-4 select-none" 
+        onMouseUp={handleTextSelection}
+      >
+        <canvas
+          id={`page-${pageNum}`}
+          className="bg-white shadow-lg"
+        />
+        <div
+          id={`text-layer-${pageNum}`}
+          className="absolute top-0 left-0 text-layer select-text"
+        />
+      </div>
+    ))}
+  </div>
+);
 } 

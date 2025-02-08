@@ -1,0 +1,36 @@
+.text-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  opacity: 0.2;
+  line-height: 1;
+  text-align: initial;
+  user-select: text;
+  pointer-events: auto;
+  transform-origin: 0 0;
+  z-index: 2;
+}
+
+.text-layer > span {
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+  color: transparent;
+  transform: scale(var(--scale-factor, 1));
+}
+
+.text-layer ::selection {
+  background: rgb(0, 0, 255, 0.2);
+}
+
+.text-layer .highlight {
+  margin: -1px;
+  padding: 1px;
+  background-color: rgba(255, 255, 0, 0.4);
+  border-radius: 2px;
+}
+
+.text-layer .highlight.selected {
+  background-color: rgba(0, 100, 0, 0.2);
+} 
