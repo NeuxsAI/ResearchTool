@@ -7,25 +7,22 @@ const DATA_ENGINE_URL = process.env.NEXT_PUBLIC_DATA_ENGINE_URL || 'http://local
 
 async function indexPaperInRAG(paperId: string, pdfUrl: string) {
   try {
-    const response = await fetch(`/api/rag/index-paper`, {
+    const ragResponse = await fetch(`${process.env.NEXT_PUBLIC_RAG_API_URL}/papers/${paperId}/index-pdf`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        paper_id: paperId,
         pdf_url: pdfUrl
       })
     });
 
-    if (!response.ok) {
-      throw new Error('Failed to index paper in RAG');
+    if (!ragResponse.ok) {
+      const error = await ragResponse.text();
+      console.error('Failed to index paper in RAG service:', error);
     }
-
-    return await response.json();
-  } catch (error) {
-    console.error('Error indexing paper:', error);
-    return null;
+  } catch (ragError) {
+    console.error('Error indexing paper in RAG:', ragError);
   }
 }
 
@@ -71,10 +68,14 @@ export async function POST(request: Request) {
       console.error('Failed to store papers:', storeError);
     }
 
-    // Index papers in RAG
+    // Index papers in RAG using UUID and proxy URL
+    console.log('Starting RAG indexing for papers:', papersToStore.map(p => ({ id: p.id })));
+    console.log('RAG API URL:', process.env.NEXT_PUBLIC_RAG_API_URL);
+
+    const origin = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001';
     await Promise.all(
       papersToStore.map(paper => 
-        indexPaperInRAG(paper.id, paper.url)
+        indexPaperInRAG(paper.id, `${origin}/api/papers/${paper.id}/pdf`)
       )
     );
 
