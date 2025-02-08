@@ -6,12 +6,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, MessageSquare, Pencil, LayoutGrid, List } from "lucide-react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { AddPaperDialog } from "@/components/library/add-paper-dialog";
-import { getPapers, getCategories } from "@/lib/supabase/db";
+import { getPapers, getCategories, deletePaper } from "@/lib/supabase/db";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PaperCard } from "@/components/paper-card";
 import { cache, CACHE_KEYS } from '@/lib/cache';
+import { DeletePaperDialog } from "@/components/library/delete-paper-dialog";
+import { toast } from "sonner";
 
 interface Paper {
   id: string;
@@ -91,6 +93,8 @@ export default function RecentPage() {
   const [isAddPaperOpen, setIsAddPaperOpen] = useState(false);
   const [recentPapers, setRecentPapers] = useState<Paper[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [paperToDelete, setPaperToDelete] = useState<Paper | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -131,6 +135,33 @@ export default function RecentPage() {
     // Pre-fetch the paper page for instant navigation
     router.prefetch(`/paper/${paper.id}`);
     router.push(`/paper/${paper.id}`);
+  };
+
+  const handleDeletePaper = async (paper: Paper) => {
+    setPaperToDelete(paper);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!paperToDelete) return;
+
+    try {
+      setIsDeleting(true);
+      const result = await deletePaper(paperToDelete.id);
+      
+      if (result.error) {
+        throw result.error;
+      }
+
+      // Update local state
+      setRecentPapers(prevPapers => prevPapers.filter(p => p.id !== paperToDelete.id));
+      toast.success("Paper deleted successfully");
+    } catch (error) {
+      console.error("Error deleting paper:", error);
+      toast.error("Failed to delete paper");
+    } finally {
+      setIsDeleting(false);
+      setPaperToDelete(null);
+    }
   };
 
   const renderSkeletons = () => (
@@ -251,6 +282,7 @@ export default function RecentPage() {
                             } : undefined
                           }}
                           onSchedule={(date, time, repeat) => {}}
+                          onDelete={() => handleDeletePaper(paper)}
                           isLoading={isLoading}
                           context="recent"
                           showAddToListButton={false}
@@ -317,6 +349,7 @@ export default function RecentPage() {
                             } : undefined
                           }}
                           onSchedule={(date, time, repeat) => {}}
+                          onDelete={() => handleDeletePaper(paper)}
                           isLoading={isLoading}
                           context="recent"
                           showAddToListButton={false}
@@ -335,6 +368,14 @@ export default function RecentPage() {
       <AddPaperDialog 
         open={isAddPaperOpen} 
         onOpenChange={setIsAddPaperOpen} 
+      />
+
+      <DeletePaperDialog
+        open={Boolean(paperToDelete)}
+        onOpenChange={(open) => !open && setPaperToDelete(null)}
+        onConfirm={handleConfirmDelete}
+        paperTitle={paperToDelete?.title || ""}
+        isDeleting={isDeleting}
       />
     </MainLayout>
   );

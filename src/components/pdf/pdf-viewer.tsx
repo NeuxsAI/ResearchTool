@@ -66,8 +66,17 @@ export function PDFViewer({ url, onSelection, annotations = [] }: PDFViewerProps
 
     async function loadPDF() {
       try {
+        // Use the URL directly since it's already the PDF endpoint
         console.log('Loading PDF:', url);
-        const pdf = await pdfjsLib.getDocument(url).promise;
+        
+        const loadingTask = pdfjsLib.getDocument({
+          url: url,
+          withCredentials: true,
+          cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/cmaps/',
+          cMapPacked: true,
+        });
+        
+        const pdf = await loadingTask.promise;
         if (!mounted) return;
         
         pdfRef.current = pdf;
@@ -83,6 +92,7 @@ export function PDFViewer({ url, onSelection, annotations = [] }: PDFViewerProps
         }
       } catch (error) {
         console.error('Error loading PDF:', error);
+        setIsLoading(false);
       }
     }
 

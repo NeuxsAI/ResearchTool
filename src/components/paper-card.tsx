@@ -1,4 +1,4 @@
-import { BookMarked, FileText, Star, Calendar } from "lucide-react";
+import { BookMarked, FileText, Star, Calendar, Trash2, BookOpen, Loader2 } from "lucide-react";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
@@ -17,6 +17,7 @@ interface PaperCardProps {
   paper: Paper;
   onAddToList?: () => void;
   onSchedule?: (date: Date, estimatedTime?: number, repeat?: "daily" | "weekly" | "monthly" | "none") => void;
+  onDelete?: () => void;
   onChangeCategory?: () => void;
   isLoading?: boolean;
   variant?: 'default' | 'compact';
@@ -24,19 +25,24 @@ interface PaperCardProps {
   showCategoryButton?: boolean;
   showAddToListButton?: boolean;
   context?: 'main' | 'reading-list' | 'discover';
+  onAddToLibrary?: (paper: Paper) => Promise<void>;
+  isAdding?: boolean;
 }
 
 export function PaperCard({ 
   paper, 
   onAddToList, 
   onSchedule, 
+  onDelete,
   onChangeCategory, 
   isLoading,
   variant = 'default',
   showScheduleButton = true,
   showCategoryButton = true,
   showAddToListButton = true,
-  context = 'main'
+  context = 'main',
+  onAddToLibrary,
+  isAdding
 }: PaperCardProps) {
   const router = useRouter();
   const [date, setDate] = useState<Date>();
@@ -87,129 +93,109 @@ export function PaperCard({
       whileTap={{ scale: 0.995 }}
     >
       <Card 
+        className="bg-[#1c1c1c] border-[#2a2a2a] overflow-hidden cursor-pointer hover:border-[#3a3a3a] transition-all duration-200 group"
         onClick={() => router.push(`/paper/${paper.id}`)}
-        className={cn(
-          "p-4 hover:bg-[#1c1c1c] transition-colors cursor-pointer border-[#2a2a2a] min-h-[150px] flex flex-col",
-          variant === 'compact' ? "m-0" : "m-3", 
-          isLoading && "opacity-50 pointer-events-none"
-        )}
       >
-        <div className="flex items-start gap-4 flex-grow">
-          <div className="flex-shrink-0 w-10 h-10 rounded bg-[#2a2a2a] flex items-center justify-center">
-            <FileText className="h-5 w-5 text-[#666]" />
+        <div className="p-4">
+          <div className="flex items-center gap-2 flex-wrap mb-2">
+            <Badge 
+              variant="secondary" 
+              className={
+                paper.impact === "high"
+                  ? "bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 text-xs font-medium"
+                  : "bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 text-xs font-medium"
+              }
+            >
+              {paper.impact === "high" ? "High Impact" : "Low Impact"}
+            </Badge>
+            <div className="flex items-center gap-1.5 text-[#666]">
+              <span className="text-xs">{paper.year}</span>
+              <span className="text-xs">•</span>
+              <span className="text-xs">{paper.citations} citations</span>
+            </div>
           </div>
-          <div className="flex-1 min-w-0 flex flex-col">
-            <div className="flex items-start justify-between gap-4 mb-2">
-              <div className="min-w-0 flex-1">
-                <h3 className="text-sm font-medium text-white leading-tight mb-1 line-clamp-2">
-                  {paper.title}
-                </h3>
-                <div className="flex items-center gap-3 text-[11px] text-[#666] flex-wrap">
-                  {paper.category && (
-                    <span className="flex items-center gap-1.5 min-w-0">
-                      <div 
-                        className="w-1.5 h-1.5 rounded-full flex-shrink-0" 
-                        style={{ backgroundColor: paper.category.color || '#666' }}
-                      />
-                      <span className="truncate">{paper.category.name}</span>
-                    </span>
-                  )}
-                  <span className="flex items-center gap-1 whitespace-nowrap">
-                    <Star className="h-3 w-3 flex-shrink-0" />
-                    {paper.citations} citations
-                  </span>
-                  <span className="whitespace-nowrap">{paper.year}</span>
-                  {paper.institution && (
-                    <span className="truncate max-w-[200px]">{paper.institution}</span>
-                  )}
-                </div>
-              </div>
-              <Badge 
-                className={cn(
-                  "h-5 px-1.5 text-[10px] whitespace-nowrap flex-shrink-0",
-                  paper.impact === "high" 
-                    ? "bg-violet-500/10 text-violet-500 hover:bg-violet-500/20"
-                    : "bg-blue-500/10 text-blue-500 hover:bg-blue-500/20"
-                )}
+          
+          <h3 className="text-sm font-medium text-white mb-1.5 leading-snug group-hover:text-violet-400 transition-colors line-clamp-2">
+            {paper.title}
+          </h3>
+          
+          <p className="text-xs text-[#888] mb-3 line-clamp-1">
+            {paper.authors.join(", ")}
+          </p>
+
+          {paper.abstract && (
+            <p className="text-xs text-[#888] mb-3 line-clamp-2 leading-relaxed">
+              {paper.abstract}
+            </p>
+          )}
+          
+          <div className="flex flex-wrap items-center gap-1">
+            {paper.topics.slice(0, 3).map((topic, i) => (
+              <Badge
+                key={i}
+                variant="secondary"
+                className="bg-[#2a2a2a]/50 text-[#888] text-[10px] px-1.5 py-0"
               >
-                {paper.impact === "high" ? "High Impact" : "Low Impact"}
+                {topic}
               </Badge>
-            </div>
-            {paper.abstract && (
-              <p className="text-xs text-[#888] mb-3 line-clamp-2 leading-relaxed">
-                {paper.abstract}
-              </p>
+            ))}
+            {paper.topics.length > 3 && (
+              <span className="text-[10px] text-[#666]">
+                +{paper.topics.length - 3} more
+              </span>
             )}
-            <div className="flex flex-wrap gap-1.5">
-              {paper.topics.map((topic) => (
-                <Badge 
-                  key={topic}
-                  variant="secondary" 
-                  className="bg-[#2a2a2a] hover:bg-[#333] text-[10px] px-1.5 py-0 text-[#888] truncate max-w-[150px]"
-                >
-                  {topic}
-                </Badge>
-              ))}
-            </div>
           </div>
         </div>
 
         {/* Status indicators */}
-        <div className="flex items-center gap-2 mt-3">
-          {isScheduled && (
-            <Badge 
-              variant="secondary" 
-              className="h-5 px-1.5 text-[10px] bg-violet-500/10 text-violet-500"
-            >
-              <Calendar className="h-3 w-3 mr-1" />
-              Scheduled
-            </Badge>
-          )}
-          {isInReadingList && (
-            <Badge 
-              variant="secondary" 
-              className="h-5 px-1.5 text-[10px] bg-blue-500/10 text-blue-500"
-            >
-              <BookMarked className="h-3 w-3 mr-1" />
-              In Reading List
-            </Badge>
-          )}
-          {paper.status && (
-            <Badge 
-              variant="secondary" 
-              className={cn(
-                "h-5 px-1.5 text-[10px]",
-                paper.status === 'completed' && "bg-green-500/10 text-green-500",
-                paper.status === 'in_progress' && "bg-yellow-500/10 text-yellow-500",
-                paper.status === 'unread' && "bg-gray-500/10 text-gray-500"
-              )}
-            >
-              {paper.status === 'completed' ? 'Read' : 
-               paper.status === 'in_progress' ? 'Reading' : 'Unread'}
-            </Badge>
-          )}
-        </div>
+        {(isScheduled || isInReadingList || paper.status) && (
+          <div className="px-4 py-2 border-t border-[#2a2a2a] flex items-center gap-1.5">
+            {isScheduled && (
+              <Badge variant="secondary" className="h-4 px-1.5 text-[10px] bg-violet-500/10 text-violet-400">
+                <Calendar className="h-3 w-3 mr-1" />
+                Scheduled
+              </Badge>
+            )}
+            {isInReadingList && (
+              <Badge variant="secondary" className="h-4 px-1.5 text-[10px] text-blue-400">
+                <BookMarked className="h-3 w-3 mr-1" />
+                In List
+              </Badge>
+            )}
+            {paper.status && (
+              <Badge 
+                variant="secondary" 
+                className={cn(
+                  "h-4 px-1.5 text-[10px]",
+                  paper.status === 'completed' && "bg-green-500/10 text-green-400",
+                  paper.status === 'in_progress' && "bg-yellow-500/10 text-yellow-400",
+                  paper.status === 'unread' && "bg-gray-500/10 text-gray-400"
+                )}
+              >
+                {paper.status === 'completed' ? 'Read' : 
+                 paper.status === 'in_progress' ? 'Reading' : 'Unread'}
+              </Badge>
+            )}
+          </div>
+        )}
 
         {/* Action buttons */}
         <div 
-          className="flex items-center justify-end gap-2 mt-3 pt-3"
+          className="px-4 py-2 border-t border-[#2a2a2a] flex items-center gap-1.5"
           onClick={(e) => {
             e.stopPropagation();
             e.preventDefault();
           }}
         >
           {shouldShowScheduleButton && onSchedule && (
-            <Popover 
-              open={open} 
-              onOpenChange={setOpen}
-            >
+            <Popover open={open} onOpenChange={setOpen}>
               <PopoverTrigger asChild>
                 <Button
                   variant="ghost"
                   size="sm"
                   className={cn(
-                    "h-7 px-2.5 text-[11px] hover:bg-[#333] text-white",
-                    isScheduled ? "bg-violet-500/10 text-violet-500" : "bg-[#2a2a2a]"
+                    "h-6 px-2 text-[10px]",
+                    isScheduled ? "bg-violet-500/10 text-violet-400 hover:bg-violet-500/20" : "bg-[#2a2a2a] hover:bg-[#333] text-white"
                   )}
                   onClick={(e) => {
                     if (isLoading) return;
@@ -219,8 +205,8 @@ export function PaperCard({
                   }}
                   disabled={isLoading}
                 >
-                  <Calendar className="h-3.5 w-3.5 mr-1.5" />
-                  {isScheduled ? 'Update Schedule' : 'Schedule'}
+                  <Calendar className="h-3 w-3 mr-1" />
+                  {isScheduled ? 'Update' : 'Schedule'}
                 </Button>
               </PopoverTrigger>
               <PopoverContent 
@@ -280,7 +266,7 @@ export function PaperCard({
             <Button
               variant="ghost"
               size="sm"
-              className="h-7 px-2.5 text-[11px] hover:bg-[#333] bg-[#2a2a2a] text-white"
+              className="h-6 px-2 text-[10px] hover:bg-[#333] bg-[#2a2a2a] text-white"
               onClick={(e) => {
                 e.stopPropagation();
                 e.preventDefault();
@@ -288,8 +274,8 @@ export function PaperCard({
               }}
               disabled={isLoading}
             >
-              <BookMarked className="h-3.5 w-3.5 mr-1.5" />
-              {paper.category ? 'Change Category' : 'Add Category'}
+              <BookMarked className="h-3 w-3 mr-1" />
+              Category
             </Button>
           )}
 
@@ -297,12 +283,63 @@ export function PaperCard({
             <Button
               variant="ghost"
               size="sm"
-              className="h-7 px-2.5 text-[11px] hover:bg-[#333] bg-[#2a2a2a] text-white"
+              className="h-6 px-2 text-[10px] hover:bg-[#333] bg-[#2a2a2a] text-white"
               onClick={handleAddToList}
               disabled={isLoading}
             >
-              <BookMarked className="h-3.5 w-3.5 mr-1.5" />
-              Add to List
+              <BookMarked className="h-3 w-3 mr-1" />
+              Add
+            </Button>
+          )}
+
+          {context === "main" && onDelete && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+              }}
+              className="h-6 px-2 text-[10px] text-red-400 hover:text-red-400 hover:bg-red-500/10"
+            >
+              <Trash2 className="h-3 w-3 mr-1" />
+              Delete
+            </Button>
+          )}
+
+          {onAddToLibrary && (
+            <Button
+              variant="secondary"
+              size="sm"
+              className={`h-6 px-2 text-[10px] font-medium transition-colors ml-auto
+                ${isAdding 
+                  ? 'bg-[#2a2a2a] text-[#888]' 
+                  : paper.in_reading_list 
+                  ? 'bg-violet-500/10 text-violet-400 hover:bg-violet-500/20'
+                  : 'bg-[#2a2a2a] text-white hover:bg-[#333]'
+                }`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onAddToLibrary(paper);
+              }}
+              disabled={isAdding || paper.in_reading_list}
+            >
+              {isAdding ? (
+                <>
+                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                  Adding...
+                </>
+              ) : paper.in_reading_list ? (
+                <>
+                  <FileText className="h-3 w-3 mr-1" />
+                  In Library
+                </>
+              ) : (
+                <>
+                  <BookOpen className="h-3 w-3 mr-1" />
+                  Add
+                </>
+              )}
             </Button>
           )}
         </div>

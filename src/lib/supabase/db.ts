@@ -224,8 +224,13 @@ export async function updatePaper(
 }
 
 export async function deletePaper(id: string, token?: string): Promise<DbResult<Paper>> {
-  const supabase = createServerClient(token)
-  return await supabase.from('papers').delete().eq('id', id).select().single()
+  const supabase = createBrowserClient()
+  return await supabase
+    .from('papers')
+    .delete()
+    .eq('id', id)
+    .select()
+    .single()
 }
 
 // Annotations
@@ -629,17 +634,17 @@ export async function trackPaperInteraction(
   metadata?: any
 ) {
   try {
-    const supabase = createClient();
-    const { data: { session } } = await supabase.auth.getSession();
+    const supabase = createBrowserClient();
+    const { data: { user } } = await supabase.auth.getUser();
     
-    if (!session?.user) {
+    if (!user) {
       throw new Error('Not authenticated');
     }
 
     const { error } = await supabase
       .from('paper_interactions')
       .insert({
-        user_id: session.user.id,
+        user_id: user.id,
         paper_id: paperId,
         action,
         metadata: metadata || null
@@ -656,10 +661,10 @@ export async function trackPaperInteraction(
 // Function to get user's paper interactions
 export async function getUserPaperInteractions(limit?: number) {
   try {
-    const supabase = createClient();
-    const { data: { session } } = await supabase.auth.getSession();
+    const supabase = createBrowserClient();
+    const { data: { user } } = await supabase.auth.getUser();
     
-    if (!session?.user) {
+    if (!user) {
       throw new Error('Not authenticated');
     }
 
@@ -669,7 +674,7 @@ export async function getUserPaperInteractions(limit?: number) {
         *,
         paper:papers(*)
       `)
-      .eq('user_id', session.user.id)
+      .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 
     if (limit) {

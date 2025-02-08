@@ -29,11 +29,17 @@ async function preloadPapers(refresh = false) {
       fetch(`/api/papers/trending${refresh ? '?refresh=true' : ''}`).then(r => r.json())
   ]);
 
-  if (recommendedResponse.papers) {
-    cache.set(CACHE_KEYS.RECOMMENDED_PAPERS, recommendedResponse.papers);
-  }
-  if (trendingResponse.papers) {
-    cache.set(CACHE_KEYS.TRENDING_PAPERS, trendingResponse.papers);
+  if (!refresh) {
+    if (recommendedResponse.papers) {
+      cache.set(CACHE_KEYS.RECOMMENDED_PAPERS, recommendedResponse.papers);
+    }
+    if (trendingResponse.papers) {
+      cache.set(CACHE_KEYS.TRENDING_PAPERS, trendingResponse.papers);
+    }
+  } else {
+    // Clear cache when refreshing
+    cache.delete(CACHE_KEYS.RECOMMENDED_PAPERS);
+    cache.delete(CACHE_KEYS.TRENDING_PAPERS);
   }
 
   return {
@@ -149,7 +155,7 @@ export default function DiscoverPage() {
 
   const renderPaperCard = (paper: Paper) => (
     <motion.div
-      className="absolute w-full h-full"
+      className="absolute w-full h-full p-10"
       custom={direction}
       variants={variants}
       initial="enter"
@@ -261,14 +267,14 @@ export default function DiscoverPage() {
         <div className="p-6">
           <Tabs 
             defaultValue="recommended" 
-            className="w-full max-w-2xl mx-auto relative"
+            className="w-full mx-auto relative"
             onValueChange={(value) => {
               setActiveTab(value);
               setCurrentIndex(0);
             }}
           >
             <div className="flex items-center justify-between mb-4">
-              <TabsList className="h-9 bg-[#1c1c1c] border border-[#2a2a2a] p-1">
+              <TabsList className="h-9 bg-[#1c1c1c] border border-[#2a2a2a] p-1 items-center mx-auto">
                 <TabsTrigger 
                   value="recommended" 
                   className="h-7 px-4 text-xs data-[state=active]:bg-[#2a2a2a]"
@@ -284,17 +290,6 @@ export default function DiscoverPage() {
                   Trending
                 </TabsTrigger>
               </TabsList>
-
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 px-3 text-xs text-[#888] hover:text-white hover:bg-[#2a2a2a]"
-                onClick={handleRefresh}
-                disabled={isRefreshing || isLoading}
-              >
-                <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-                Refresh
-              </Button>
             </div>
 
             <div className="flex items-center">
@@ -309,7 +304,7 @@ export default function DiscoverPage() {
 
               <div className="relative h-[400px] flex-1">
                 {isLoading ? (
-                  <Card className="h-full bg-[#1c1c1c] border-[#2a2a2a] animate-pulse">
+                  <Card className="h-full bg-[#1c1c1c] border-[#2a2a2a] animate-pulse p-4">
                     <div className="p-4">
                       <div className="h-4 bg-[#2a2a2a] rounded w-1/4 mb-2" />
                       <div className="h-6 bg-[#2a2a2a] rounded w-3/4 mb-2" />

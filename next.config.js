@@ -23,6 +23,10 @@ const nextConfig = {
             {
               key: 'Access-Control-Allow-Headers',
               value: 'Content-Type, Authorization'
+            },
+            {
+              key: 'Access-Control-Allow-Credentials',
+              value: 'true'
             }
           ]
         }
@@ -40,6 +44,9 @@ const nextConfig = {
       ignoreDuringBuilds: true
     },
     staticPageGenerationTimeout: 120,
+    devIndicators: {
+      appIsrStatus: false,
+    }, // Disable all dev indicators completely
   };
   
   module.exports = nextConfig;

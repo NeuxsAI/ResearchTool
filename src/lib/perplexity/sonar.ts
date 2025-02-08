@@ -56,9 +56,9 @@ Apply these filters:
 - Impact level: ${impact}
 - Topics: ${topics.join(", ")}
 
-ONLY RETURN ARXIV PAPERS. 
+Ensure the URL is valid PDF link. Only return ArXiv papers.
 
-Your response must be ONLY the JSON array, nothing else. Try to fetch at least 3 papers, you can fetch more if you can (that's preferable) however no more than 25 and please rank by relevance to the query.`;
+Your response must be ONLY the JSON array, nothing else. At the minimum, return 5 papers, validate and ensure the paper is real.`;
 
   try {
     const response = await fetch("https://api.perplexity.ai/chat/completions", {

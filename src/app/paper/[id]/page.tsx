@@ -248,84 +248,85 @@ export default function PaperPage() {
         timestamp: new Date().toISOString(),
         highlightText: highlightedText // Include current highlight with message
       };
-      setChatMessages(prev => [...prev, userMessage]);
+      
+      const updatedMessages = [...chatMessages, userMessage];
+      setChatMessages(updatedMessages);
 
-      // Create initial streaming message
-      const streamingMessage: ChatMessage = {
-        role: "assistant",
-        content: "",
-        timestamp: new Date().toISOString(),
-        highlightText: highlightedText, // Include current highlight with response
-        isStreaming: true
-      };
-      setChatMessages(prev => [...prev, streamingMessage]);
-
-      // Send to API with all messages including context
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: {
-          'Content-Type': 'application/json',
-        },
+      // Create EventSource for streaming response
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: [...chatMessages, userMessage],
-          highlightedText,
-        }),
+          messages: updatedMessages,
+          paperId: paper?.id,  // Pass the paper ID for RAG context
+          highlightedText
+        })
       });
 
       if (!response.ok) {
-        throw new Error("Failed to get response");
+        throw new Error('Failed to send message');
       }
 
-      if (!response.body) {
-        throw new Error("No response body");
-      }
-
-      const reader = response.body.getReader();
+      const reader = response.body?.getReader();
       const decoder = new TextDecoder();
 
-      let accumulatedContent = "";
-      
+      if (!reader) {
+        throw new Error('No response reader available');
+      }
+
+      // Add assistant message placeholder
+      const assistantMessage: ChatMessage = {
+        role: "assistant",
+        content: "",
+        timestamp: new Date().toISOString(),
+        isStreaming: true
+      };
+      setChatMessages([...updatedMessages, assistantMessage]);
+
+      // Read the stream
       while (true) {
-        const { value, done } = await reader.read();
+        const { done, value } = await reader.read();
         if (done) break;
-        
+
         const chunk = decoder.decode(value);
         const lines = chunk.split('\n');
-        
+
         for (const line of lines) {
           if (line.startsWith('data: ')) {
             try {
-              const data = JSON.parse(line.slice(6));
-              accumulatedContent += data.content || "";
-              
-              // Update the streaming message with accumulated content
-              setChatMessages(prev => {
-                const newMessages = [...prev];
-                const lastMessage = newMessages[newMessages.length - 1];
-                if (lastMessage && lastMessage.isStreaming) {
-                  lastMessage.content = accumulatedContent;
-                }
-                return newMessages;
-              });
+              const data = JSON.parse(line.slice(5));
+              if (data.content) {
+                setChatMessages(messages => {
+                  const lastMessage = messages[messages.length - 1];
+                  if (lastMessage.role === "assistant" && lastMessage.isStreaming) {
+                    const updatedMessage = {
+                      ...lastMessage,
+                      content: lastMessage.content + data.content
+                    };
+                    return [...messages.slice(0, -1), updatedMessage];
+                  }
+                  return messages;
+                });
+              }
             } catch (e) {
-              console.error("Error parsing SSE data:", e);
+              console.error('Error parsing SSE data:', e);
             }
           }
         }
       }
 
-      // Mark message as done streaming
-      setChatMessages(prev => {
-        const newMessages = [...prev];
-        const lastMessage = newMessages[newMessages.length - 1];
-        if (lastMessage && lastMessage.isStreaming) {
-          lastMessage.isStreaming = false;
+      // Mark streaming as complete
+      setChatMessages(messages => {
+        const lastMessage = messages[messages.length - 1];
+        if (lastMessage.role === "assistant" && lastMessage.isStreaming) {
+          return [...messages.slice(0, -1), { ...lastMessage, isStreaming: false }];
         }
-        return newMessages;
+        return messages;
       });
+
     } catch (error) {
-      console.error("Chat error:", error);
-      toast.error("Failed to send message");
+      console.error('Chat error:', error);
+      toast.error('Failed to send message');
     } finally {
       setIsChatLoading(false);
     }
@@ -410,7 +411,7 @@ export default function PaperPage() {
           {paper?.url ? (
             <div onClick={handleContainerClick} className="h-full relative">
               <PDFViewer 
-                url={paper.url} 
+                url={`/api/papers/${paper.id}/pdf`}
                 onSelection={handleTextSelection}
                 annotations={annotations}
                 onAnnotationClick={handleAnnotationClick}
