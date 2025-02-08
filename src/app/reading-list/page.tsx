@@ -8,7 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { getReadingList, getPapers, getCategories, addToReadingList, schedulePaper } from "@/lib/supabase/db";
+import { getReadingList, getPapers, getCategories, addToReadingList, schedulePaper, deletePaper } from "@/lib/supabase/db";
 import { 
   FileText, 
   Calendar as CalendarIcon, 
@@ -44,6 +44,8 @@ import { Paper } from "@/lib/types";
 import { PaperCard, PaperCardSkeleton } from "@/components/paper-card";
 import { SelectSingleEventHandler } from "react-day-picker";
 import { cache, CACHE_KEYS } from '@/lib/cache';
+import { DeletePaperDialog } from "@/components/library/delete-paper-dialog";
+import { toast } from "sonner";
 
 // Interface for Supabase data
 interface SupabasePaper {
@@ -161,6 +163,8 @@ export default function ReadingListPage() {
   const [searchError, setSearchError] = useState<string | null>(null);
   const [scheduledViewMode, setScheduledViewMode] = useState<'grid' | 'calendar'>('grid');
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [paperToDelete, setPaperToDelete] = useState<Paper | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const exampleQueries = [
     { text: "Attention mechanisms", icon: Sparkles },
@@ -462,6 +466,34 @@ export default function ReadingListPage() {
     return scheduledDate >= today;
   });
 
+  const handleDeletePaper = async (paper: Paper) => {
+    setPaperToDelete(paper);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!paperToDelete) return;
+
+    try {
+      setIsDeleting(true);
+      const result = await deletePaper(paperToDelete.id);
+      
+      if (result.error) {
+        throw result.error;
+      }
+
+      // Update local state
+      setPapers(prevPapers => prevPapers.filter(p => p.id !== paperToDelete.id));
+      setReadingList(prevList => prevList.filter(item => item.paper_id !== paperToDelete.id));
+      toast.success("Paper deleted successfully");
+    } catch (error) {
+      console.error("Error deleting paper:", error);
+      toast.error("Failed to delete paper");
+    } finally {
+      setIsDeleting(false);
+      setPaperToDelete(null);
+    }
+  };
+
   return (
     <MainLayout>
       <div className="flex flex-col h-full">
@@ -692,9 +724,11 @@ export default function ReadingListPage() {
                             <div key={paper.id} onClick={() => handlePaperClick(paper)}>
                               <PaperCard
                                 paper={paper}
+                                onDelete={() => handleDeletePaper(paper)}
                                 onAddToList={() => handleAddToList(paper)}
                                 onSchedule={(date, time, repeat) => handleSchedulePaper(paper, date, time, repeat)}
                                 isLoading={isLoading}
+                                context="reading-list"
                               />
                             </div>
                           ))
@@ -886,9 +920,11 @@ export default function ReadingListPage() {
                         <div key={paper.id} onClick={() => handlePaperClick(paper)}>
                           <PaperCard
                             paper={paper}
+                            onDelete={() => handleDeletePaper(paper)}
                             onAddToList={() => handleAddToList(paper)}
                             onSchedule={(date, time, repeat) => handleSchedulePaper(paper, date, time, repeat)}
                             isLoading={isLoading}
+                            context="reading-list"
                           />
                         </div>
                       ))}
@@ -1119,6 +1155,7 @@ export default function ReadingListPage() {
                               estimated_time: paper.estimated_time,
                               repeat: paper.repeat
                             }}
+                            onDelete={() => handleDeletePaper(paper)}
                             onAddToList={() => handleAddToList(paper)}
                             onSchedule={(date, time, repeat) => handleSchedulePaper(paper, date, time, repeat)}
                             isLoading={isLoading}
@@ -1137,6 +1174,15 @@ export default function ReadingListPage() {
           )}
         </div>
       </div>
+
+      {/* Add Delete Dialog */}
+      <DeletePaperDialog
+        open={Boolean(paperToDelete)}
+        onOpenChange={(open) => !open && setPaperToDelete(null)}
+        onConfirm={handleConfirmDelete}
+        paperTitle={paperToDelete?.title || ""}
+        isDeleting={isDeleting}
+      />
     </MainLayout>
   );
 }

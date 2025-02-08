@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileText, Plus, Grid2x2, Search, Clock, BookOpen, Filter, Activity, MessageSquare, ChevronDown, SlidersHorizontal } from "lucide-react";
 import { AddPaperDialog } from "@/components/library/add-paper-dialog";
-import { getPapers, getCategories, getReadingList, getAnnotationsByPaper, schedulePaper, addToReadingList } from "@/lib/supabase/db";
+import { getPapers, getCategories, getReadingList, getAnnotationsByPaper, schedulePaper, addToReadingList, deletePaper } from "@/lib/supabase/db";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,6 +18,8 @@ import { PaperCard } from "@/components/paper-card";
 import { Paper } from "@/lib/types";
 import { useCategories } from "@/lib/context/categories-context";
 import { cn } from "@/lib/utils";
+import { DeletePaperDialog } from "@/components/library/delete-paper-dialog";
+import { toast } from "sonner";
 
 interface Category {
   id: string;
@@ -89,6 +91,8 @@ export default function LibraryPage() {
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [showAllCategories, setShowAllCategories] = useState(false);
   const [filterDialogOpen, setFilterDialogOpen] = useState(false);
+  const [paperToDelete, setPaperToDelete] = useState<Paper | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Optimized data loading
   useEffect(() => {
@@ -238,6 +242,37 @@ export default function LibraryPage() {
       );
     } catch (error) {
       console.error("Error scheduling paper:", error);
+    }
+  };
+
+  const handleDeletePaper = async (paper: Paper) => {
+    setPaperToDelete(paper);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!paperToDelete) return;
+
+    try {
+      setIsDeleting(true);
+      const result = await deletePaper(paperToDelete.id);
+      
+      if (result.error) {
+        throw result.error;
+      }
+
+      // Update local state
+      setPapers(prevPapers => prevPapers.filter(p => p.id !== paperToDelete.id));
+      setRecentAnnotations(prevAnnotations => 
+        prevAnnotations.filter(a => a.paper_id !== paperToDelete.id)
+      );
+      
+      toast.success("Paper deleted successfully");
+    } catch (error) {
+      console.error("Error deleting paper:", error);
+      toast.error("Failed to delete paper");
+    } finally {
+      setIsDeleting(false);
+      setPaperToDelete(null);
     }
   };
 
@@ -508,6 +543,7 @@ export default function LibraryPage() {
                               onSchedule={(date, estimatedTime, repeat) => 
                                 handleSchedulePaper(paper.id, date, estimatedTime, repeat)
                               }
+                              onDelete={() => handleDeletePaper(paper)}
                               isLoading={isLoading}
                               context="main"
                               showScheduleButton={!readingList.some(item => item.paper_id === paper.id)}
@@ -534,6 +570,15 @@ export default function LibraryPage() {
       />
 
       {renderFilterDialog()}
+
+      {/* Add Delete Dialog */}
+      <DeletePaperDialog
+        open={Boolean(paperToDelete)}
+        onOpenChange={(open) => !open && setPaperToDelete(null)}
+        onConfirm={handleConfirmDelete}
+        paperTitle={paperToDelete?.title || ""}
+        isDeleting={isDeleting}
+      />
     </motion.div>
   );
 } 

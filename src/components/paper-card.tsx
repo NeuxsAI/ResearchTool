@@ -1,4 +1,4 @@
-import { BookMarked, FileText, Star, Calendar } from "lucide-react";
+import { BookMarked, FileText, Star, Calendar, Trash2 } from "lucide-react";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
@@ -17,6 +17,7 @@ interface PaperCardProps {
   paper: Paper;
   onAddToList?: () => void;
   onSchedule?: (date: Date, estimatedTime?: number, repeat?: "daily" | "weekly" | "monthly" | "none") => void;
+  onDelete?: () => void;
   onChangeCategory?: () => void;
   isLoading?: boolean;
   variant?: 'default' | 'compact';
@@ -30,6 +31,7 @@ export function PaperCard({
   paper, 
   onAddToList, 
   onSchedule, 
+  onDelete,
   onChangeCategory, 
   isLoading,
   variant = 'default',
@@ -303,6 +305,21 @@ export function PaperCard({
             >
               <BookMarked className="h-3.5 w-3.5 mr-1.5" />
               Add to List
+            </Button>
+          )}
+
+          {context === "main" && onDelete && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+              }}
+              className="h-7 px-2 text-[11px] text-red-500 hover:text-red-400 hover:bg-red-500/10"
+            >
+              <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+              Delete
             </Button>
           )}
         </div>

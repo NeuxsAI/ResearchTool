@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Trash2, MessageSquare, Pencil, LayoutGrid, List, Settings2 } from "lucide-react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { AddPaperDialog } from "@/components/library/add-paper-dialog";
-import { getCategoryById, getPapersByCategory, updatePaper, updateCategory } from "@/lib/supabase/db";
+import { getCategoryById, getPapersByCategory, updatePaper, updateCategory, deletePaper } from "@/lib/supabase/db";
 import { toast } from "sonner";
 import { useParams, useRouter } from "next/navigation";
 import { EditPaperDialog } from "@/components/library/edit-paper-dialog";
@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PaperCard } from "@/components/paper-card";
+import { DeletePaperDialog } from "@/components/library/delete-paper-dialog";
 
 interface Category {
   id: string;
@@ -59,6 +60,8 @@ export default function CategoryPage() {
   const [isEditPaperOpen, setIsEditPaperOpen] = useState(false);
   const [isEditCategoryOpen, setIsEditCategoryOpen] = useState(false);
   const [editedCategory, setEditedCategory] = useState<Category | null>(null);
+  const [paperToDelete, setPaperToDelete] = useState<Paper | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     async function loadData() {
@@ -147,6 +150,33 @@ export default function CategoryPage() {
     } catch (error) {
       console.error("Error updating category:", error);
       toast.error("Failed to update category");
+    }
+  };
+
+  const handleDeletePaper = async (paper: Paper) => {
+    setPaperToDelete(paper);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!paperToDelete) return;
+
+    try {
+      setIsDeleting(true);
+      const result = await deletePaper(paperToDelete.id);
+      
+      if (result.error) {
+        throw result.error;
+      }
+
+      // Update local state
+      setPapers(prevPapers => prevPapers.filter(p => p.id !== paperToDelete.id));
+      toast.success("Paper deleted successfully");
+    } catch (error) {
+      console.error("Error deleting paper:", error);
+      toast.error("Failed to delete paper");
+    } finally {
+      setIsDeleting(false);
+      setPaperToDelete(null);
     }
   };
 
@@ -305,6 +335,11 @@ export default function CategoryPage() {
                         in_reading_list: true
                       }}
                       onSchedule={() => {}}
+                      onDelete={() => handleDeletePaper(paper)}
+                      isLoading={isLoading}
+                      context="category"
+                      showAddToListButton={false}
+                      variant="compact"
                     />
                   ))}
                 </div>
@@ -325,6 +360,11 @@ export default function CategoryPage() {
                         in_reading_list: true
                       }}
                       onSchedule={() => {}}
+                      onDelete={() => handleDeletePaper(paper)}
+                      isLoading={isLoading}
+                      context="category"
+                      showAddToListButton={false}
+                      variant="compact"
                     />
                   ))}
                 </div>
@@ -383,5 +423,13 @@ export default function CategoryPage() {
         </form>
       </DialogContent>
     </Dialog>
+
+    <DeletePaperDialog
+      open={Boolean(paperToDelete)}
+      onOpenChange={(open) => !open && setPaperToDelete(null)}
+      onConfirm={handleConfirmDelete}
+      paperTitle={paperToDelete?.title || ""}
+      isDeleting={isDeleting}
+    />
   </MainLayout>;
 } 
