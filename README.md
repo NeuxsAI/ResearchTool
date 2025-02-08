@@ -1,36 +1,47 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Research Paper Discovery Platform
 
-## Getting Started
+A Next.js-based web application powered by AI for intelligent academic paper discovery and management. Built with React Server Components, TypeScript, and Tailwind CSS.
 
-First, run the development server:
+## Technical Stack
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- **Framework**: Next.js 14 with App Router
+- **UI Components**: Custom components built on Radix UI primitives
+- **Styling**: Tailwind CSS with custom dark theme configuration
+- **Icons**: Lucide React for consistent iconography
+- **Layout**: CSS Grid and Flexbox with responsive breakpoints
+- **State Management**: React Hooks and Context API
+- **AI Integration**: OpenAI API for paper recommendations and analysis
+- **Database**: Supabase for paper storage and user data
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Architecture
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+The application follows a component-based architecture with:
+- Shared UI components in `components/ui`
+- Layout components in `components/layout`
+- Feature-specific components in respective feature directories
+- Client-side components marked with "use client" directive
+- Server-side rendering for optimal performance
+- AI recommendation engine for personalized paper suggestions
+- Vector embeddings for semantic paper similarity
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Current Features
 
-## Learn More
+- AI-powered paper recommendations based on user interests
+- Intelligent paper categorization and topic extraction
+- Impact score prediction using citation analysis
+- Personalized reading lists and libraries
+- Dark mode optimized reading experience
 
-To learn more about Next.js, take a look at the following resources:
+## Upcoming Features
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- ArXiv integration for real-time paper ingestion
+- Automated paper indexing and metadata extraction
+- Enhanced semantic search capabilities
+- Citation network analysis and visualization
+- Collaborative reading lists and annotations
+- PDF parsing and full-text search
+- Research trend analysis and predictions
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Development Setup
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+First, install dependencies and start the development server:
