@@ -518,7 +518,7 @@ export default function LibraryPage() {
                             whileTap={{ scale: 0.99 }}
                             className={cn(
                               "min-h-[180px]",
-                              viewMode === "list" ? "max-w-3xl mx-auto" : "h-full"
+                              viewMode === "list" ? "max-w-4xl p-2  mx-auto" : "h-full"
                             )}
                           >
                             <PaperCard

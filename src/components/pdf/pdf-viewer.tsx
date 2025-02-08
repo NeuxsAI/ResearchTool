@@ -66,8 +66,17 @@ export function PDFViewer({ url, onSelection, annotations = [] }: PDFViewerProps
 
     async function loadPDF() {
       try {
-        console.log('Loading PDF:', url);
-        const pdf = await pdfjsLib.getDocument(url).promise;
+        // Extract arxiv ID from the URL
+        const arxivId = url.split('/').pop()?.replace('.pdf', '');
+        if (!arxivId) {
+          throw new Error('Invalid PDF URL');
+        }
+
+        // Use our proxy endpoint
+        const proxyUrl = `/api/papers/${arxivId}/pdf`;
+        console.log('Loading PDF through proxy:', proxyUrl);
+        
+        const pdf = await pdfjsLib.getDocument(proxyUrl).promise;
         if (!mounted) return;
         
         pdfRef.current = pdf;
@@ -83,6 +92,7 @@ export function PDFViewer({ url, onSelection, annotations = [] }: PDFViewerProps
         }
       } catch (error) {
         console.error('Error loading PDF:', error);
+        setIsLoading(false);
       }
     }
 
