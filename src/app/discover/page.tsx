@@ -152,7 +152,10 @@ export default function DiscoverPage() {
         opacity: { duration: 0.2 }
       }}
     >
-      <Card className="max-h-[500px] bg-[#1c1c1c] border-[#2a2a2a] overflow-auto">
+      <Card 
+        className="max-h-[500px] bg-[#1c1c1c] border-[#2a2a2a] overflow-auto cursor-pointer hover:border-[#3a3a3a] transition-colors"
+        onClick={() => router.push(`/paper/${paper.id}`)}
+      >
         <div className="sticky top-0 z-10 bg-[#1c1c1c] p-4 border-b border-[#2a2a2a]">
           <div className="flex items-center gap-2 flex-wrap mb-2">
             <span className="text-[11px] text-[#666]">{paper.year}</span>

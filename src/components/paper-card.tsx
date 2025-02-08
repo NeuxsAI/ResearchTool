@@ -10,6 +10,8 @@ import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Paper } from "@/lib/types";
+import { useRouter } from "next/navigation";
+
 
 interface PaperCardProps {
   paper: Paper;
@@ -36,6 +38,7 @@ export function PaperCard({
   showAddToListButton = true,
   context = 'main'
 }: PaperCardProps) {
+  const router = useRouter();
   const [date, setDate] = useState<Date>();
   const [estimatedTime, setEstimatedTime] = useState<string>("");
   const [repeat, setRepeat] = useState<"daily" | "weekly" | "monthly" | "none">("none");
@@ -83,11 +86,14 @@ export function PaperCard({
       whileHover={{ scale: 0.995 }}
       whileTap={{ scale: 0.995 }}
     >
-      <Card className={cn(
-        "p-4 hover:bg-[#1c1c1c] transition-colors cursor-pointer border-[#2a2a2a] min-h-[150px] flex flex-col",
-        variant === 'compact' ? "m-0" : "m-3",
-        isLoading && "opacity-50 pointer-events-none"
-      )}>
+      <Card 
+        onClick={() => router.push(`/paper/${paper.id}`)}
+        className={cn(
+          "p-4 hover:bg-[#1c1c1c] transition-colors cursor-pointer border-[#2a2a2a] min-h-[150px] flex flex-col",
+          variant === 'compact' ? "m-0" : "m-3", 
+          isLoading && "opacity-50 pointer-events-none"
+        )}
+      >
         <div className="flex items-start gap-4 flex-grow">
           <div className="flex-shrink-0 w-10 h-10 rounded bg-[#2a2a2a] flex items-center justify-center">
             <FileText className="h-5 w-5 text-[#666]" />
