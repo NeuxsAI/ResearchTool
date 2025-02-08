@@ -13,22 +13,42 @@ export default function SettingsPage() {
   const { user } = useUser();
   const [isLoading, setIsLoading] = useState(false);
   const [fullName, setFullName] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
     async function loadProfile() {
-      if (!user) return;
+      if (!user?.id) return;
+      
       try {
+        setIsLoading(true);
         const { data, error } = await supabase
           .from("profiles")
-          .select("full_name")
+          .select("*")
           .eq("id", user.id)
           .single();
         
-        if (error) throw error;
+        if (error) {
+          console.error("Error loading profile:", error);
+          // If no profile exists, create one
+          if (error.code === 'PGRST116') {
+            const { error: insertError } = await supabase
+              .from("profiles")
+              .insert({ id: user.id })
+              .single();
+            
+            if (insertError) throw insertError;
+          } else {
+            throw error;
+          }
+        }
+        
         if (data) setFullName(data.full_name || "");
       } catch (error) {
         console.error("Error loading profile:", error);
+        toast.error("Failed to load profile");
+      } finally {
+        setIsLoading(false);
       }
     }
     loadProfile();
@@ -36,10 +56,10 @@ export default function SettingsPage() {
 
   const handleUpdateProfile = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user?.id) return;
 
     try {
-      setIsLoading(true);
+      setIsSaving(true);
       const { error } = await supabase
         .from("profiles")
         .upsert({
@@ -54,78 +74,122 @@ export default function SettingsPage() {
       console.error("Error updating profile:", error);
       toast.error("Failed to update profile");
     } finally {
-      setIsLoading(false);
+      setIsSaving(false);
     }
   };
 
+  if (isLoading) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="w-5 h-5 border-t-2 border-zinc-500 rounded-full animate-spin" />
+        </div>
+      </MainLayout>
+    );
+  }
+
   return (
     <MainLayout>
-      <div className="p-6">
-        <h1 className="text-sm font-medium text-white mb-4">Settings</h1>
+      <div className="max-w-2xl mx-auto px-4 py-8">
+        <h1 className="text-zinc-100 text-xl font-medium mb-8">Settings</h1>
         
-        <div className="space-y-6 bg-[#1c1c1c] rounded-lg p-6">
-          <div>
-            <h2 className="text-[11px] font-medium text-[#888] mb-4">Profile</h2>
+        <div className="space-y-6">
+          {/* Profile Section */}
+          <section className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-zinc-400 text-sm font-medium">Profile</h2>
+            </div>
+            
             <form onSubmit={handleUpdateProfile} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-[11px] text-[#888]">Email</Label>
+              <div className="space-y-3">
+                <Label htmlFor="email" className="text-xs font-medium text-zinc-500">
+                  Email
+                </Label>
                 <Input
                   id="email"
                   value={user?.email || ""}
                   disabled
-                  className="h-8 text-[11px] bg-[#2a2a2a] border-[#2a2a2a] text-[#888]"
+                  className="h-9 text-sm bg-zinc-900/50 border-zinc-800 text-zinc-400"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="fullName" className="text-[11px] text-[#888]">Full Name</Label>
+              
+              <div className="space-y-3">
+                <Label htmlFor="fullName" className="text-xs font-medium text-zinc-500">
+                  Full Name
+                </Label>
                 <Input
                   id="fullName"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   placeholder="Enter your full name"
-                  className="h-8 text-[11px] bg-[#2a2a2a] border-[#2a2a2a] text-white placeholder:text-[#666]"
+                  className="h-9 text-sm bg-zinc-900/50 border-zinc-800 text-zinc-200 placeholder:text-zinc-600"
                 />
               </div>
-              <Button
-                type="submit"
-                disabled={isLoading}
-                className="h-8 text-[11px] bg-[#2a2a2a] hover:bg-[#333] text-white"
-              >
-                Save Changes
-              </Button>
-            </form>
-          </div>
 
-          <div>
-            <h2 className="text-[11px] font-medium text-[#888] mb-4">Preferences</h2>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="theme" className="text-[11px] text-[#888]">Theme</Label>
-                <select
-                  id="theme"
-                  className="w-full h-8 text-[11px] bg-[#2a2a2a] border-[#2a2a2a] rounded-md text-white px-2 appearance-none"
-                  defaultValue="dark"
+              <div className="pt-2">
+                <Button
+                  type="submit"
+                  disabled={isSaving}
+                  className="h-9 px-4 text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-200"
                 >
-                  <option value="dark">Dark</option>
-                  <option value="light">Light</option>
-                  <option value="system">System</option>
-                </select>
+                  {isSaving ? (
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 border-t-2 border-zinc-400 rounded-full animate-spin" />
+                      <span>Saving...</span>
+                    </div>
+                  ) : (
+                    'Save Changes'
+                  )}
+                </Button>
               </div>
-            </div>
-          </div>
+            </form>
+          </section>
 
-          <div>
-            <h2 className="text-[11px] font-medium text-[#888] mb-4">Danger Zone</h2>
-            <div className="flex items-center">
+          {/* Preferences Section */}
+          <section className="space-y-6 pt-6 border-t border-zinc-800">
+            <div className="flex items-center justify-between">
+              <h2 className="text-zinc-400 text-sm font-medium">Preferences</h2>
+            </div>
+            
+            <div className="space-y-3">
+              <Label htmlFor="theme" className="text-xs font-medium text-zinc-500">
+                Theme
+              </Label>
+              <select
+                id="theme"
+                className="w-full h-9 text-sm bg-zinc-900/50 border-zinc-800 rounded-md text-zinc-200 px-3 disable"
+                disabled
+                defaultValue="dark"
+              >
+                <option value="dark">Dark</option>
+                <option value="light">Light</option>
+                <option value="system">System</option>
+              </select>
+            </div>
+          </section>
+
+          {/* Danger Zone */}
+          <section className="space-y-6 pt-6 border-t border-zinc-800">
+            <div className="flex items-center justify-between">
+              <h2 className="text-zinc-400 text-sm font-medium">Danger Zone</h2>
+            </div>
+            
+            <div className="flex items-center justify-between p-4 bg-zinc-900/50 border border-red-900/20 rounded-lg">
+              <div className="space-y-1">
+                <h3 className="text-sm font-medium text-zinc-200">Delete Account</h3>
+                <p className="text-xs text-zinc-500">
+                  Permanently remove your account and all its data
+                </p>
+              </div>
               <Button
-                variant="ghost"
-                className="text-[11px] text-red-400 hover:text-red-400 bg-[#2a2a2a] p-2"
+                variant="destructive"
+                className="h-8 px-3 text-xs font-medium bg-red-900/20 hover:bg-red-900/40 text-red-500 border border-red-900/20"
                 onClick={() => toast.error("Account deletion is not implemented yet")}
               >
                 Delete Account
               </Button>
             </div>
-          </div>
+          </section>
         </div>
       </div>
     </MainLayout>

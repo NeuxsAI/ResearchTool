@@ -31,14 +31,17 @@ import {
   Clock as ClockIcon,
   Zap,
   Layers,
-  Brain
+  Brain,
+  Grid2x2,
+  Plus
 } from "lucide-react";
 import { format, startOfWeek, endOfWeek, isWithinInterval, setDate, addWeeks, addMonths, differenceInWeeks, differenceInMonths } from "date-fns";
 import { MainLayout } from "@/components/layout/main-layout";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import { PaperCard, PaperCardSkeleton, Paper } from "@/components/paper-card";
+import { Paper } from "@/lib/types";
+import { PaperCard, PaperCardSkeleton } from "@/components/paper-card";
 import { SelectSingleEventHandler } from "react-day-picker";
 
 // Interface for Supabase data
@@ -112,6 +115,8 @@ export default function ReadingListPage() {
   const [hasSearched, setHasSearched] = useState(false);
   const [searchResults, setSearchResults] = useState<Paper[]>([]);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [scheduledViewMode, setScheduledViewMode] = useState<'grid' | 'calendar'>('grid');
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
   const exampleQueries = [
     { text: "Attention mechanisms", icon: Sparkles },
@@ -133,7 +138,7 @@ export default function ReadingListPage() {
     
     setIsLoading(true);
     setSearchError(null);
-    setSearchResults([]);
+    setHasSearched(true);
     
     try {
       const response = await fetch('/api/papers/search', {
@@ -156,19 +161,18 @@ export default function ReadingListPage() {
       }
 
       const data = await response.json();
-      setHasSearched(true);
       
-      const papersArray = Array.isArray(data.papers) ? data.papers : [];
-      const mappedPapers = papersArray.map((paper: any) => ({
+      const mappedPapers = (data.papers || []).map((paper: any) => ({
         id: paper.id,
         title: paper.title,
         abstract: paper.abstract,
-        authors: paper.authors,
-        year: paper.year,
+        authors: paper.authors || [],
+        year: paper.year || new Date().getFullYear(),
         citations: paper.citations || 0,
         impact: paper.impact || "low",
         url: paper.url,
         topics: paper.topics || [],
+        institution: paper.institution,
         in_reading_list: readingList.some(item => item.paper_id === paper.id)
       }));
       
@@ -176,6 +180,7 @@ export default function ReadingListPage() {
     } catch (error) {
       console.error('Search error:', error);
       setSearchError(error instanceof Error ? error.message : 'Failed to search papers');
+      setSearchResults([]);
     } finally {
       setIsLoading(false);
     }
@@ -364,9 +369,9 @@ export default function ReadingListPage() {
     }
   };
 
-  const handleDateSelect: SelectSingleEventHandler = (newDate) => {
-    if (newDate) {
-      setDate(newDate);
+  const handleDateSelect = (date: Date | undefined) => {
+    if (date) {
+      setSelectedDate(date);
     }
   };
 
@@ -405,59 +410,65 @@ export default function ReadingListPage() {
     const weekStart = startOfWeek(today);
     const weekEnd = endOfWeek(today);
     
-    // Check if it's scheduled for this week
-    if (isWithinInterval(scheduledDate, { start: weekStart, end: weekEnd })) {
-      return true;
+    // For non-repeating papers, only include if they're scheduled for this week
+    if (!paper.repeat) {
+      return isWithinInterval(scheduledDate, { start: weekStart, end: weekEnd });
     }
     
-    // Check if it's a repeating paper that falls within this week
-    if (paper.repeat) {
-      switch (paper.repeat) {
-        case 'daily':
-          return true;
-        case 'weekly':
-          const weeksSinceScheduled = differenceInWeeks(today, scheduledDate);
-          return weeksSinceScheduled >= 0;
-        case 'monthly':
-          const monthsSinceScheduled = differenceInMonths(today, scheduledDate);
-          const monthlyDate = new Date(today);
-          monthlyDate.setDate(scheduledDate.getDate());
-          return monthsSinceScheduled >= 0 && isWithinInterval(monthlyDate, { start: weekStart, end: weekEnd });
-        default:
-          return false;
+    // For repeating papers
+    switch (paper.repeat) {
+      case 'daily':
+        return true;
+      case 'weekly': {
+        // Calculate the next occurrence after weekStart
+        const daysSinceScheduled = Math.floor((weekStart.getTime() - scheduledDate.getTime()) / (1000 * 60 * 60 * 24));
+        const daysToAdd = 7 - (daysSinceScheduled % 7);
+        const nextOccurrence = new Date(weekStart);
+        nextOccurrence.setDate(nextOccurrence.getDate() + daysToAdd);
+        return isWithinInterval(nextOccurrence, { start: weekStart, end: weekEnd });
       }
+      case 'monthly': {
+        // Check if the monthly date falls within this week
+        const monthlyDate = new Date(today.getFullYear(), today.getMonth(), scheduledDate.getDate());
+        return isWithinInterval(monthlyDate, { start: weekStart, end: weekEnd });
+      }
+      default:
+        return false;
     }
-    
-    return false;
   });
 
-  const upcomingPapers = papers.filter(paper => {
-    if (!paper.scheduled_date) return false;
-    const scheduledDate = new Date(paper.scheduled_date);
+  const upcomingPapers = papers.filter(p => {
+    if (!p.scheduled_date) return false;
+    const scheduledDate = new Date(p.scheduled_date);
     const today = new Date();
+    today.setHours(0, 0, 0, 0); // Reset time to start of day
     
-    // Check if it's scheduled for the future
-    if (scheduledDate > today) {
-      return true;
-    }
+    // Only include papers scheduled for future dates
+    if (scheduledDate < today) return false;
     
-    // Check if it's a repeating paper
-    if (paper.repeat) {
-      switch (paper.repeat) {
+    // For repeating papers, calculate next occurrence
+    if (p.repeat) {
+      switch (p.repeat) {
         case 'daily':
           return true;
-        case 'weekly':
-          const nextOccurrence = addWeeks(scheduledDate, Math.ceil(differenceInWeeks(today, scheduledDate)) + 1);
-          return nextOccurrence > today;
-        case 'monthly':
-          const nextMonthlyOccurrence = addMonths(scheduledDate, Math.ceil(differenceInMonths(today, scheduledDate)) + 1);
-          return nextMonthlyOccurrence > today;
+        case 'weekly': {
+          const daysSinceScheduled = Math.floor((today.getTime() - scheduledDate.getTime()) / (1000 * 60 * 60 * 24));
+          const daysUntilNext = 7 - (daysSinceScheduled % 7);
+          return daysUntilNext > 0;
+        }
+        case 'monthly': {
+          const nextOccurrence = new Date(today.getFullYear(), today.getMonth(), scheduledDate.getDate());
+          if (nextOccurrence < today) {
+            nextOccurrence.setMonth(nextOccurrence.getMonth() + 1);
+          }
+          return nextOccurrence >= today;
+        }
         default:
           return false;
       }
     }
     
-    return false;
+    return scheduledDate >= today;
   });
 
   return (
@@ -499,16 +510,37 @@ export default function ReadingListPage() {
                         Today
                       </h3>
                       {todaysPapers.length === 0 ? (
-                        <p className="text-[11px] text-[#666]">No papers scheduled for today</p>
+                        <p className="text-[11px] text-[#666] px-2">No papers scheduled for today</p>
                       ) : (
-                        <ScrollArea className="h-[100px]">
+                        <ScrollArea className="h-[120px]">
                           {todaysPapers.map(paper => (
                             <div 
                               key={paper.id} 
-                              className="text-[11px] p-1.5 hover:bg-[#2a2a2a] rounded cursor-pointer text-white"
+                              className="text-[11px] hover:bg-[#2a2a2a] rounded cursor-pointer text-white group py-1.5 px-2 mb-1 last:mb-0"
                               onClick={() => handlePaperClick(paper)}
                             >
-                              {paper.title}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5 mb-1">
+                                  {paper.scheduled_date && (
+                                    <Badge variant="secondary" className="h-4 px-1 text-[9px] bg-violet-500/10 text-violet-500 shrink-0">
+                                      {format(new Date(paper.scheduled_date), 'h:mm a')}
+                                    </Badge>
+                                  )}
+                                  {paper.estimated_time && (
+                                    <Badge variant="secondary" className="h-4 px-1 text-[9px] bg-blue-500/10 text-blue-500 shrink-0">
+                                      {paper.estimated_time}m
+                                    </Badge>
+                                  )}
+                                  {paper.repeat && (
+                                    <Badge variant="secondary" className="h-4 px-1 text-[9px] bg-emerald-500/10 text-emerald-500 shrink-0">
+                                      {paper.repeat}
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className="text-[11px] font-medium leading-snug line-clamp-2 text-white/90">
+                                  {paper.title}
+                                </div>
+                              </div>
                             </div>
                           ))}
                         </ScrollArea>
@@ -521,16 +553,37 @@ export default function ReadingListPage() {
                         This Week
                       </h3>
                       {thisWeeksPapers.length === 0 ? (
-                        <p className="text-[11px] text-[#666]">No papers scheduled this week</p>
+                        <p className="text-[11px] text-[#666] px-2">No papers scheduled this week</p>
                       ) : (
-                        <ScrollArea className="h-[100px]">
+                        <ScrollArea className="h-[120px]">
                           {thisWeeksPapers.map(paper => (
                             <div 
                               key={paper.id} 
-                              className="text-[11px] p-1.5 hover:bg-[#2a2a2a] rounded cursor-pointer text-white"
+                              className="text-[11px] hover:bg-[#2a2a2a] rounded cursor-pointer text-white group py-1.5 px-2 mb-1 last:mb-0"
                               onClick={() => handlePaperClick(paper)}
                             >
-                              {paper.title}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5 mb-1">
+                                  {paper.scheduled_date && (
+                                    <Badge variant="secondary" className="h-4 px-1 text-[9px] bg-violet-500/10 text-violet-500 shrink-0">
+                                      {format(new Date(paper.scheduled_date), 'MMM d')}
+                                    </Badge>
+                                  )}
+                                  {paper.estimated_time && (
+                                    <Badge variant="secondary" className="h-4 px-1 text-[9px] bg-blue-500/10 text-blue-500 shrink-0">
+                                      {paper.estimated_time}m
+                                    </Badge>
+                                  )}
+                                  {paper.repeat && (
+                                    <Badge variant="secondary" className="h-4 px-1 text-[9px] bg-emerald-500/10 text-emerald-500 shrink-0">
+                                      {paper.repeat}
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className="text-[11px] font-medium leading-snug line-clamp-2 text-white/90">
+                                  {paper.title}
+                                </div>
+                              </div>
                             </div>
                           ))}
                         </ScrollArea>
@@ -543,16 +596,37 @@ export default function ReadingListPage() {
                         Upcoming
                       </h3>
                       {upcomingPapers.length === 0 ? (
-                        <p className="text-[11px] text-[#666]">No upcoming papers</p>
+                        <p className="text-[11px] text-[#666] px-2">No upcoming papers</p>
                       ) : (
-                        <ScrollArea className="h-[100px]">
+                        <ScrollArea className="h-[120px]">
                           {upcomingPapers.map(paper => (
                             <div 
                               key={paper.id} 
-                              className="text-[11px] p-1.5 hover:bg-[#2a2a2a] rounded cursor-pointer text-white"
+                              className="text-[11px] hover:bg-[#2a2a2a] rounded cursor-pointer text-white group py-1.5 px-2 mb-1 last:mb-0"
                               onClick={() => handlePaperClick(paper)}
                             >
-                              {paper.title}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5 mb-1">
+                                  {paper.scheduled_date && (
+                                    <Badge variant="secondary" className="h-4 px-1 text-[9px] bg-violet-500/10 text-violet-500 shrink-0">
+                                      {format(new Date(paper.scheduled_date), 'MMM d')}
+                                    </Badge>
+                                  )}
+                                  {paper.estimated_time && (
+                                    <Badge variant="secondary" className="h-4 px-1 text-[9px] bg-blue-500/10 text-blue-500 shrink-0">
+                                      {paper.estimated_time}m
+                                    </Badge>
+                                  )}
+                                  {paper.repeat && (
+                                    <Badge variant="secondary" className="h-4 px-1 text-[9px] bg-emerald-500/10 text-emerald-500 shrink-0">
+                                      {paper.repeat}
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className="text-[11px] font-medium leading-snug line-clamp-2 text-white/90">
+                                  {paper.title}
+                                </div>
+                              </div>
                             </div>
                           ))}
                         </ScrollArea>
@@ -588,23 +662,231 @@ export default function ReadingListPage() {
                     </TabsTrigger>
                   </TabsList>
 
-                  <TabsContent value="scheduled" className="mt-3">
-                    <div className="h-[calc(100vh-12rem)] overflow-y-auto space-y-2">
-                      {isLoading ? (
-                        Array(3).fill(0).map((_, i) => <PaperCardSkeleton key={i} />)
-                      ) : (
-                        papers.filter(p => p.scheduled_date).map(paper => (
-                          <div key={paper.id} onClick={() => handlePaperClick(paper)}>
-                            <PaperCard
-                              paper={paper}
-                              onAddToList={() => handleAddToList(paper)}
-                              onSchedule={(date, time, repeat) => handleSchedulePaper(paper, date, time, repeat)}
-                              isLoading={isLoading}
-                            />
-                          </div>
-                        ))
-                      )}
+                  <TabsContent value="scheduled" className="mt-0">
+                    <div className="flex items-center justify-end gap-2 mb-3">
+                      <div className="bg-[#2a2a2a] rounded-md p-0.5 flex gap-0.5">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setScheduledViewMode('grid')}
+                          className={cn(
+                            "h-7 px-2.5 text-[11px]",
+                            scheduledViewMode === 'grid' ? "bg-[#333] text-white" : "text-[#888] hover:text-white"
+                          )}
+                        >
+                          <Grid2x2 className="h-3.5 w-3.5 mr-1.5" />
+                          Grid
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setScheduledViewMode('calendar')}
+                          className={cn(
+                            "h-7 px-2.5 text-[11px]",
+                            scheduledViewMode === 'calendar' ? "bg-[#333] text-white" : "text-[#888] hover:text-white"
+                          )}
+                        >
+                          <CalendarIcon className="h-3.5 w-3.5 mr-1.5" />
+                          Calendar
+                        </Button>
+                      </div>
                     </div>
+
+                    {scheduledViewMode === 'grid' ? (
+                      <div className="h-[calc(100vh-12rem)] overflow-y-auto space-y-2">
+                        {isLoading ? (
+                          Array(3).fill(0).map((_, i) => <PaperCardSkeleton key={i} />)
+                        ) : (
+                          papers.filter(p => p.scheduled_date).map(paper => (
+                            <div key={paper.id} onClick={() => handlePaperClick(paper)}>
+                              <PaperCard
+                                paper={paper}
+                                onAddToList={() => handleAddToList(paper)}
+                                onSchedule={(date, time, repeat) => handleSchedulePaper(paper, date, time, repeat)}
+                                isLoading={isLoading}
+                              />
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    ) : (
+                      <div className="h-[calc(100vh-12rem)] overflow-y-auto">
+                        <div className="bg-[#1c1c1c] rounded-lg">
+                          {/* Calendar Header */}
+                          <div className="flex items-center justify-between p-4 border-b border-[#2a2a2a]">
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  const prev = new Date(selectedDate);
+                                  prev.setMonth(prev.getMonth() - 1);
+                                  setSelectedDate(prev);
+                                }}
+                                className="h-7 w-7 p-0 hover:bg-[#2a2a2a]"
+                              >
+                                <ChevronDown className="h-4 w-4 rotate-90 text-[#888]" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  const next = new Date(selectedDate);
+                                  next.setMonth(next.getMonth() + 1);
+                                  setSelectedDate(next);
+                                }}
+                                className="h-7 w-7 p-0 hover:bg-[#2a2a2a]"
+                              >
+                                <ChevronDown className="h-4 w-4 -rotate-90 text-[#888]" />
+                              </Button>
+                              <h3 className="text-sm font-medium text-white">
+                                {format(selectedDate, 'MMMM yyyy')}
+                              </h3>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setSelectedDate(new Date())}
+                              className="h-7 px-2.5 text-[11px] hover:bg-[#2a2a2a] text-[#888]"
+                            >
+                              Today
+                            </Button>
+                          </div>
+
+                          {/* Calendar Grid - Make it more compact */}
+                          <div className="grid grid-cols-7 auto-rows-[80px]">
+                            {Array.from({ length: 42 }, (_, i) => {
+                              const date = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+                              date.setDate(1 - date.getDay() + i);
+                              
+                              const isCurrentMonth = date.getMonth() === selectedDate.getMonth();
+                              const isToday = format(date, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
+                              const isSelected = format(date, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd');
+                              
+                              const scheduledPapers = papers.filter(p => {
+                                if (!p.scheduled_date) return false;
+                                const paperDate = new Date(p.scheduled_date);
+                                return format(paperDate, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd');
+                              });
+
+                              return (
+                                <div
+                                  key={i}
+                                  onClick={() => handleDateSelect(date)}
+                                  className={cn(
+                                    "p-1 border-r border-b border-[#2a2a2a] last:border-r-0 relative cursor-pointer hover:bg-[#2a2a2a]/50 transition-colors",
+                                    !isCurrentMonth && "bg-[#1a1a1a]",
+                                    isSelected && "bg-[#2a2a2a]"
+                                  )}
+                                >
+                                  <div className={cn(
+                                    "text-[11px] font-medium mb-1 rounded-full w-5 h-5 flex items-center justify-center",
+                                    isToday ? "bg-violet-500 text-white" : "text-[#888]",
+                                    !isCurrentMonth && "text-[#666]"
+                                  )}>
+                                    {date.getDate()}
+                                  </div>
+                                  <div className="space-y-0.5">
+                                    {scheduledPapers.slice(0, 2).map((paper, idx) => (
+                                      <div
+                                        key={paper.id}
+                                        className={cn(
+                                          "text-[9px] px-1 py-0.5 rounded truncate",
+                                          "bg-violet-500/10 text-violet-500 border border-violet-500/20",
+                                          "hover:bg-violet-500/20 transition-colors cursor-pointer"
+                                        )}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handlePaperClick(paper);
+                                        }}
+                                      >
+                                        {paper.estimated_time && (
+                                          <span className="mr-1 opacity-70">{paper.estimated_time}m</span>
+                                        )}
+                                        {paper.title}
+                                      </div>
+                                    ))}
+                                    {scheduledPapers.length > 2 && (
+                                      <div className="text-[9px] text-[#666] px-1">
+                                        +{scheduledPapers.length - 2} more
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Selected Day Schedule */}
+                        <div className="mt-4 bg-[#1c1c1c] rounded-lg p-4">
+                          <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-sm font-medium text-white">
+                              Schedule for {format(selectedDate, 'MMMM d, yyyy')}
+                            </h3>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2.5 text-[11px] hover:bg-[#2a2a2a] text-violet-500"
+                              onClick={() => {
+                                // Open schedule dialog for this date
+                                // You can implement this functionality
+                              }}
+                            >
+                              <Plus className="h-3.5 w-3.5 mr-1.5" />
+                              Add paper
+                            </Button>
+                          </div>
+
+                          <div className="space-y-2">
+                            {papers
+                              .filter(p => {
+                                if (!p.scheduled_date) return false;
+                                const paperDate = new Date(p.scheduled_date);
+                                return format(paperDate, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd');
+                              })
+                              .sort((a, b) => {
+                                if (!a.scheduled_date || !b.scheduled_date) return 0;
+                                return new Date(a.scheduled_date).getTime() - new Date(b.scheduled_date).getTime();
+                              })
+                              .map(paper => (
+                                <div
+                                  key={paper.id}
+                                  className="flex items-start gap-3 p-2 hover:bg-[#2a2a2a] rounded-lg transition-colors cursor-pointer group"
+                                  onClick={() => handlePaperClick(paper)}
+                                >
+                                  <div className="w-12 text-center">
+                                    <div className="text-[11px] font-medium text-violet-500">
+                                      {paper.estimated_time}m
+                                    </div>
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <h4 className="text-sm text-white group-hover:text-violet-500 transition-colors line-clamp-1">
+                                      {paper.title}
+                                    </h4>
+                                    {paper.authors && (
+                                      <p className="text-[11px] text-[#888] line-clamp-1">
+                                        {paper.authors.join(', ')}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 hover:bg-[#333]"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      // Implement edit schedule functionality
+                                    }}
+                                  >
+                                    <Clock className="h-3.5 w-3.5 text-[#888]" />
+                                  </Button>
+                                </div>
+                              ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </TabsContent>
 
                   <TabsContent value="unscheduled" className="mt-3">
@@ -746,34 +1028,53 @@ export default function ReadingListPage() {
               {/* Main Content Area */}
               <div className="flex-1 min-w-0 p-4">
                 <div className="h-full flex flex-col">
-                  <form onSubmit={(e) => { e.preventDefault(); handleSearch(searchQuery); }} className="relative">
+                  <div className="relative mb-6">
                     <Search className={cn(
                       "absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5",
-                      isLoading ? "text-blue-500 animate-pulse" : "text-[#666]"
+                      isLoading ? "text-violet-500" : "text-[#666]"
                     )} />
-                    <Input
-                      value={searchQuery}
-                      onChange={(e) => {
-                        setSearchQuery(e.target.value);
-                        if (e.target.value === "") setHasSearched(false);
-                      }}
-                      placeholder="Search for papers, authors, or topics..."
-                      className="pl-8 h-8 text-[11px] bg-[#2a2a2a] border-[#333] focus:ring-1 focus:ring-violet-500/30"
-                      disabled={isLoading}
-                    />
-                  </form>
+                    <form onSubmit={(e) => { 
+                      e.preventDefault(); 
+                      handleSearch(searchQuery); 
+                    }}>
+                      <Input
+                        value={searchQuery}
+                        onChange={(e) => {
+                          setSearchQuery(e.target.value);
+                          if (e.target.value === "") {
+                            setHasSearched(false);
+                            setSearchResults([]);
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            handleSearch(searchQuery);
+                          }
+                        }}
+                        placeholder="Search for papers, authors, or topics..."
+                        className="pl-8 h-8 text-[11px] bg-[#2a2a2a] border-[#333] focus:ring-1 focus:ring-violet-500/30"
+                        disabled={isLoading}
+                      />
+                    </form>
+                  </div>
 
-                  {!hasSearched ? (
+                  {isLoading ? (
+                    <div className="space-y-4">
+                      {[1, 2, 3].map((i) => (
+                        <PaperCardSkeleton key={i} />
+                      ))}
+                    </div>
+                  ) : !hasSearched ? (
                     <div className="flex-1 flex flex-col items-center justify-center text-center px-4">
-                      <div className="w-full max-w-md space-y-4">
+                      <div className="w-full max-w-md space-y-6">
                         <div className="flex justify-center">
-                          <div className="w-12 h-12 rounded-full bg-violet-500/10 flex items-center justify-center">
-                            <Search className="h-6 w-6 text-violet-500" />
+                          <div className="w-12 h-12 rounded-full bg-[#2a2a2a] flex items-center justify-center">
+                            <Search className="h-6 w-6 text-[#666]" />
                           </div>
                         </div>
                         <div>
-                          <h3 className="text-lg font-medium text-white mb-2">Search for Research Papers</h3>
-                          <p className="text-sm text-[#888]">
+                          <h3 className="text-sm font-medium text-white mb-2">Search for Research Papers</h3>
+                          <p className="text-xs text-[#888]">
                             Enter a topic, author, or paper title to discover relevant research papers
                           </p>
                         </div>
@@ -792,58 +1093,52 @@ export default function ReadingListPage() {
                         </div>
                       </div>
                     </div>
-                  ) : (
-                    <div className="mt-6 flex-1 overflow-hidden">
-                      <div className="h-full overflow-y-auto">
-                        {isLoading ? (
-                          <motion.div 
-                            className="space-y-4"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ duration: 0.2 }}
-                          >
-                            <PaperCardSkeleton />
-                            <PaperCardSkeleton />
-                            <PaperCardSkeleton />
-                          </motion.div>
-                        ) : searchError ? (
-                          <motion.div 
-                            className="text-red-500 text-center py-4"
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.3 }}
-                          >
-                            {searchError}
-                          </motion.div>
-                        ) : searchResults.length === 0 ? (
-                          <motion.div 
-                            className="text-center py-4 text-muted-foreground"
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.3 }}
-                          >
-                            No papers found matching your search.
-                          </motion.div>
-                        ) : (
-                          <motion.div 
-                            className="space-y-4"
-                            variants={containerVariants}
-                            initial="hidden"
-                            animate="visible"
-                          >
-                            {searchResults.map((paper) => (
-                              <motion.div key={paper.id} variants={itemVariants}>
-                                <PaperCard
-                                  paper={paper}
-                                  onAddToList={() => handleAddToList(paper)}
-                                  isLoading={isLoading}
-                                />
-                              </motion.div>
-                            ))}
-                          </motion.div>
-                        )}
+                  ) : searchError ? (
+                    <div className="flex flex-col items-center justify-center py-8 text-center">
+                      <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center mb-4">
+                        <Search className="h-6 w-6 text-red-500" />
                       </div>
+                      <p className="text-sm text-red-500">{searchError}</p>
                     </div>
+                  ) : searchResults.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-8 text-center">
+                      <div className="w-12 h-12 rounded-full bg-[#2a2a2a] flex items-center justify-center mb-4">
+                        <Search className="h-6 w-6 text-[#666]" />
+                      </div>
+                      <p className="text-sm text-[#888]">No papers found matching your search.</p>
+                    </div>
+                  ) : (
+                    <motion.div 
+                      className="space-y-4 pb-4"
+                      variants={containerVariants}
+                      initial="hidden"
+                      animate="visible"
+                    >
+                      {searchResults.map((paper) => (
+                        <motion.div key={paper.id} variants={itemVariants}>
+                          <PaperCard
+                            paper={{
+                              ...paper,
+                              citations: paper.citations || 0,
+                              impact: paper.impact || "low",
+                              url: paper.url || "",
+                              topics: paper.topics || [],
+                              in_reading_list: readingList.some(item => item.paper_id === paper.id),
+                              scheduled_date: paper.scheduled_date,
+                              estimated_time: paper.estimated_time,
+                              repeat: paper.repeat
+                            }}
+                            onAddToList={() => handleAddToList(paper)}
+                            onSchedule={(date, time, repeat) => handleSchedulePaper(paper, date, time, repeat)}
+                            isLoading={isLoading}
+                            variant="compact"
+                            context="discover"
+                            showScheduleButton={!paper.in_reading_list}
+                            showAddToListButton={!paper.in_reading_list}
+                          />
+                        </motion.div>
+                      ))}
+                    </motion.div>
                   )}
                 </div>
               </div>

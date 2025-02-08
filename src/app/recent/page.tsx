@@ -209,17 +209,25 @@ export default function RecentPage() {
                         <PaperCard
                           paper={{
                             ...paper,
-                            citations: 0,
-                            impact: "low",
-                            topics: [],
+                            citations: paper.citations || 0,
+                            impact: paper.impact || "low",
+                            topics: paper.topics || [],
+                            url: paper.url || "",
+                            scheduled_date: paper.scheduled_date,
+                            estimated_time: paper.estimated_time,
+                            repeat: paper.repeat,
+                            in_reading_list: paper.in_reading_list,
                             category: paper.category_id ? {
                               id: paper.category_id,
                               name: paper.category || "",
                               color: paper.category_color
                             } : undefined
                           }}
-                          onAddToList={() => {}}
-                          onSchedule={() => {}}
+                          onSchedule={(date, time, repeat) => {}}
+                          isLoading={isLoading}
+                          context="recent"
+                          showAddToListButton={false}
+                          variant="compact"
                         />
                       </motion.div>
                     ))}
@@ -267,17 +275,25 @@ export default function RecentPage() {
                         <PaperCard
                           paper={{
                             ...paper,
-                            citations: 0,
-                            impact: "low",
-                            topics: [],
+                            citations: paper.citations || 0,
+                            impact: paper.impact || "low",
+                            topics: paper.topics || [],
+                            url: paper.url || "",
+                            scheduled_date: paper.scheduled_date,
+                            estimated_time: paper.estimated_time,
+                            repeat: paper.repeat,
+                            in_reading_list: paper.in_reading_list,
                             category: paper.category_id ? {
                               id: paper.category_id,
                               name: paper.category || "",
                               color: paper.category_color
                             } : undefined
                           }}
-                          onAddToList={() => {}}
-                          onSchedule={() => {}}
+                          onSchedule={(date, time, repeat) => {}}
+                          isLoading={isLoading}
+                          context="recent"
+                          showAddToListButton={false}
+                          variant="compact"
                         />
                       </motion.div>
                     ))}

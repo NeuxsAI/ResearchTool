@@ -9,29 +9,7 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-
-export interface Paper {
-  id: string;
-  title: string;
-  abstract?: string;
-  authors: string[];
-  year: number;
-  citations: number;
-  institution?: string;
-  impact: "high" | "low";
-  url: string;
-  topics: string[];
-  scheduled_date?: string;
-  estimated_time?: number;
-  category_id?: string;
-  category?: {
-    id: string;
-    name: string;
-    color?: string;
-  };
-  repeat?: "daily" | "weekly" | "monthly" | "none";
-  in_reading_list?: boolean;
-}
+import { Paper } from "@/lib/types";
 
 interface PaperCardProps {
   paper: Paper;
@@ -39,9 +17,25 @@ interface PaperCardProps {
   onSchedule?: (date: Date, estimatedTime?: number, repeat?: "daily" | "weekly" | "monthly" | "none") => void;
   onChangeCategory?: () => void;
   isLoading?: boolean;
+  variant?: 'default' | 'compact';
+  showScheduleButton?: boolean;
+  showCategoryButton?: boolean;
+  showAddToListButton?: boolean;
+  context?: 'main' | 'reading-list' | 'discover';
 }
 
-export function PaperCard({ paper, onAddToList, onSchedule, onChangeCategory, isLoading }: PaperCardProps) {
+export function PaperCard({ 
+  paper, 
+  onAddToList, 
+  onSchedule, 
+  onChangeCategory, 
+  isLoading,
+  variant = 'default',
+  showScheduleButton = true,
+  showCategoryButton = true,
+  showAddToListButton = true,
+  context = 'main'
+}: PaperCardProps) {
   const [date, setDate] = useState<Date>();
   const [estimatedTime, setEstimatedTime] = useState<string>("");
   const [repeat, setRepeat] = useState<"daily" | "weekly" | "monthly" | "none">("none");
@@ -49,6 +43,17 @@ export function PaperCard({ paper, onAddToList, onSchedule, onChangeCategory, is
 
   // Initialize scheduled state from paper prop
   const isScheduled = !!paper.scheduled_date;
+  const isInReadingList = paper.in_reading_list;
+
+  // Determine button visibility based on context and paper state
+  const shouldShowScheduleButton = showScheduleButton && (
+    context === 'reading-list' || 
+    (!isInReadingList && context === 'discover') ||
+    (!isScheduled && context === 'main')
+  );
+
+  const shouldShowAddToListButton = showAddToListButton && !isInReadingList;
+  const shouldShowCategoryButton = showCategoryButton && (isInReadingList || paper.category);
 
   const handleAddToList = (e: React.MouseEvent) => {
     if (isLoading) return;
@@ -75,11 +80,12 @@ export function PaperCard({ paper, onAddToList, onSchedule, onChangeCategory, is
 
   return (
     <motion.div 
-      whileHover={{ scale: 0.99 }}
-      whileTap={{ scale: 0.99 }}
+      whileHover={{ scale: 0.995 }}
+      whileTap={{ scale: 0.995 }}
     >
       <Card className={cn(
-        "p-4 hover:bg-[#2a2a2a] transition-colors cursor-pointer border-[#2a2a2a] min-h-[150px] flex flex-col",
+        "p-4 hover:bg-[#1c1c1c] transition-colors cursor-pointer border-[#2a2a2a] min-h-[150px] flex flex-col",
+        variant === 'compact' ? "m-0" : "m-3",
         isLoading && "opacity-50 pointer-events-none"
       )}>
         <div className="flex items-start gap-4 flex-grow">
@@ -88,31 +94,33 @@ export function PaperCard({ paper, onAddToList, onSchedule, onChangeCategory, is
           </div>
           <div className="flex-1 min-w-0 flex flex-col">
             <div className="flex items-start justify-between gap-4 mb-2">
-              <div>
+              <div className="min-w-0 flex-1">
                 <h3 className="text-sm font-medium text-white leading-tight mb-1 line-clamp-2">
                   {paper.title}
                 </h3>
-                <div className="flex items-center gap-3 text-[11px] text-[#666]">
+                <div className="flex items-center gap-3 text-[11px] text-[#666] flex-wrap">
                   {paper.category && (
-                    <span className="flex items-center gap-1.5">
+                    <span className="flex items-center gap-1.5 min-w-0">
                       <div 
-                        className="w-1.5 h-1.5 rounded-full" 
+                        className="w-1.5 h-1.5 rounded-full flex-shrink-0" 
                         style={{ backgroundColor: paper.category.color || '#666' }}
                       />
-                      {paper.category.name}
+                      <span className="truncate">{paper.category.name}</span>
                     </span>
                   )}
-                  <span className="flex items-center gap-1">
-                    <Star className="h-3 w-3" />
+                  <span className="flex items-center gap-1 whitespace-nowrap">
+                    <Star className="h-3 w-3 flex-shrink-0" />
                     {paper.citations} citations
                   </span>
-                  <span>{paper.year}</span>
-                  {paper.institution && <span>{paper.institution}</span>}
+                  <span className="whitespace-nowrap">{paper.year}</span>
+                  {paper.institution && (
+                    <span className="truncate max-w-[200px]">{paper.institution}</span>
+                  )}
                 </div>
               </div>
               <Badge 
                 className={cn(
-                  "h-5 px-1.5 text-[10px] shrink-0",
+                  "h-5 px-1.5 text-[10px] whitespace-nowrap flex-shrink-0",
                   paper.impact === "high" 
                     ? "bg-violet-500/10 text-violet-500 hover:bg-violet-500/20"
                     : "bg-blue-500/10 text-blue-500 hover:bg-blue-500/20"
@@ -131,7 +139,7 @@ export function PaperCard({ paper, onAddToList, onSchedule, onChangeCategory, is
                 <Badge 
                   key={topic}
                   variant="secondary" 
-                  className="bg-[#2a2a2a] hover:bg-[#333] text-[10px] px-1.5 py-0 text-[#888]"
+                  className="bg-[#2a2a2a] hover:bg-[#333] text-[10px] px-1.5 py-0 text-[#888] truncate max-w-[150px]"
                 >
                   {topic}
                 </Badge>
@@ -140,20 +148,54 @@ export function PaperCard({ paper, onAddToList, onSchedule, onChangeCategory, is
           </div>
         </div>
 
-        {/* Fixed button container at bottom */}
+        {/* Status indicators */}
+        <div className="flex items-center gap-2 mt-3">
+          {isScheduled && (
+            <Badge 
+              variant="secondary" 
+              className="h-5 px-1.5 text-[10px] bg-violet-500/10 text-violet-500"
+            >
+              <Calendar className="h-3 w-3 mr-1" />
+              Scheduled
+            </Badge>
+          )}
+          {isInReadingList && (
+            <Badge 
+              variant="secondary" 
+              className="h-5 px-1.5 text-[10px] bg-blue-500/10 text-blue-500"
+            >
+              <BookMarked className="h-3 w-3 mr-1" />
+              In Reading List
+            </Badge>
+          )}
+          {paper.status && (
+            <Badge 
+              variant="secondary" 
+              className={cn(
+                "h-5 px-1.5 text-[10px]",
+                paper.status === 'completed' && "bg-green-500/10 text-green-500",
+                paper.status === 'in_progress' && "bg-yellow-500/10 text-yellow-500",
+                paper.status === 'unread' && "bg-gray-500/10 text-gray-500"
+              )}
+            >
+              {paper.status === 'completed' ? 'Read' : 
+               paper.status === 'in_progress' ? 'Reading' : 'Unread'}
+            </Badge>
+          )}
+        </div>
+
+        {/* Action buttons */}
         <div 
-          className="flex items-center justify-end gap-2 mt-1 pt-2"
+          className="flex items-center justify-end gap-2 mt-3 pt-3"
           onClick={(e) => {
             e.stopPropagation();
             e.preventDefault();
           }}
         >
-          {onSchedule && (
+          {shouldShowScheduleButton && onSchedule && (
             <Popover 
               open={open} 
-              onOpenChange={(isOpen) => {
-                setOpen(isOpen);
-              }}
+              onOpenChange={setOpen}
             >
               <PopoverTrigger asChild>
                 <Button
@@ -172,7 +214,7 @@ export function PaperCard({ paper, onAddToList, onSchedule, onChangeCategory, is
                   disabled={isLoading}
                 >
                   <Calendar className="h-3.5 w-3.5 mr-1.5" />
-                  {isScheduled ? 'Scheduled' : 'Schedule'}
+                  {isScheduled ? 'Update Schedule' : 'Schedule'}
                 </Button>
               </PopoverTrigger>
               <PopoverContent 
@@ -227,40 +269,35 @@ export function PaperCard({ paper, onAddToList, onSchedule, onChangeCategory, is
               </PopoverContent>
             </Popover>
           )}
-          {paper.category ? (
-            onChangeCategory && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 px-2.5 text-[11px] hover:bg-[#333] bg-[#2a2a2a] text-white"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                  onChangeCategory();
-                }}
-                disabled={isLoading}
-              >
-                <BookMarked className="h-3.5 w-3.5 mr-1.5" />
-                Change Category
-              </Button>
-            )
-          ) : (
-            onAddToList && !paper.in_reading_list && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 px-2.5 text-[11px] hover:bg-[#333] bg-[#2a2a2a] text-white"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                  handleAddToList(e);
-                }}
-                disabled={isLoading}
-              >
-                <BookMarked className="h-3.5 w-3.5 mr-1.5" />
-                Add to list
-              </Button>
-            )
+
+          {shouldShowCategoryButton && onChangeCategory && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2.5 text-[11px] hover:bg-[#333] bg-[#2a2a2a] text-white"
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                onChangeCategory();
+              }}
+              disabled={isLoading}
+            >
+              <BookMarked className="h-3.5 w-3.5 mr-1.5" />
+              {paper.category ? 'Change Category' : 'Add Category'}
+            </Button>
+          )}
+
+          {shouldShowAddToListButton && onAddToList && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2.5 text-[11px] hover:bg-[#333] bg-[#2a2a2a] text-white"
+              onClick={handleAddToList}
+              disabled={isLoading}
+            >
+              <BookMarked className="h-3.5 w-3.5 mr-1.5" />
+              Add to List
+            </Button>
           )}
         </div>
       </Card>
@@ -270,15 +307,20 @@ export function PaperCard({ paper, onAddToList, onSchedule, onChangeCategory, is
 
 export function PaperCardSkeleton() {
   return (
-    <Card className="p-3 border-[#2a2a2a]">
-      <div className="flex items-start gap-3">
-        <div className="flex-shrink-0 w-10 h-10 rounded bg-[#2a2a2a]" />
-        <div className="flex-1 min-w-0 space-y-2">
-          <div className="h-5 bg-[#2a2a2a] rounded w-2/3" />
-          <div className="h-4 bg-[#2a2a2a] rounded w-full" />
-          <div className="h-4 bg-[#2a2a2a] rounded w-1/2" />
+    <div className="p-3">
+      <Card className="p-4 border-[#2a2a2a] min-h-[150px]">
+        <div className="flex items-start gap-4">
+          <div className="w-10 h-10 rounded bg-[#2a2a2a] animate-pulse" />
+          <div className="flex-1 space-y-3">
+            <div className="h-4 bg-[#2a2a2a] rounded animate-pulse" />
+            <div className="h-4 bg-[#2a2a2a] rounded w-3/4 animate-pulse" />
+            <div className="flex gap-2">
+              <div className="h-3 bg-[#2a2a2a] rounded w-20 animate-pulse" />
+              <div className="h-3 bg-[#2a2a2a] rounded w-20 animate-pulse" />
+            </div>
+          </div>
         </div>
-      </div>
-    </Card>
+      </Card>
+    </div>
   );
 }

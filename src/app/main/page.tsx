@@ -17,6 +17,7 @@ import { FilterSortDialog } from "@/components/library/filter-sort-dialog";
 import { PaperCard } from "@/components/paper-card";
 import { Paper } from "@/lib/types";
 import { useCategories } from "@/lib/context/categories-context";
+import { cn } from "@/lib/utils";
 
 interface Category {
   id: string;
@@ -339,7 +340,7 @@ export default function LibraryPage() {
               <h4 className="text-xs font-medium text-[#888] mb-2">
                 Reading List
               </h4>
-              <div className="space-y-2">
+              <div className="space-y-1">
                 {readingList.slice(0, 3).map(item => {
                   const paper = papers.find(p => p.id === item.paper_id);
                   if (!paper) return null;
@@ -347,13 +348,15 @@ export default function LibraryPage() {
                   return (
                     <div 
                       key={item.id} 
-                      className="flex items-center gap-2 hover:bg-[#2a2a2a] p-1.5 rounded cursor-pointer transition-colors group"
+                      className="flex items-center gap-2 hover:bg-[#2a2a2a] p-2 rounded cursor-pointer transition-colors group"
                       onClick={() => handlePaperClick(paper)}
                     >
-                      <BookOpen className="h-3.5 w-3.5 text-violet-500" />
-                      <span className="text-[11px] text-[#888] group-hover:text-white truncate">
-                        {paper.title}
-                      </span>
+                      <BookOpen className="h-3.5 w-3.5 text-violet-500 shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[11px] text-[#888] group-hover:text-white truncate leading-snug">
+                          {paper.title}
+                        </div>
+                      </div>
                     </div>
                   );
                 })}
@@ -454,9 +457,9 @@ export default function LibraryPage() {
                     <motion.div 
                       key={categoryId}
                       variants={itemVariants}
-                      className="mb-1 last:mb-0"
+                      className="mb-4 last:mb-0"
                     >
-                      <div className="flex items-center gap-2 mb-0.5">
+                      <div className="flex items-center gap-2 mb-2 px-2">
                         <div className="flex items-center gap-1.5">
                           <div 
                             className="w-1.5 h-1.5 rounded-full"
@@ -470,21 +473,33 @@ export default function LibraryPage() {
                           {papers.length} papers
                         </span>
                       </div>
-                      <div className={viewMode === "list" ? "space-y-[2px]" : "grid grid-cols-2 gap-[2px]"}>
+                      <div className={cn(
+                        viewMode === "list" 
+                          ? "space-y-[2px]" 
+                          : "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 px-2"
+                      )}>
                         {papers.map(paper => (
                           <motion.div
                             key={paper.id}
                             whileHover={{ scale: 1.01 }}
                             whileTap={{ scale: 0.99 }}
+                            className={cn(
+                              "min-h-[180px]",
+                              viewMode === "list" ? "max-w-3xl mx-auto" : "h-full"
+                            )}
                           >
                             <PaperCard
                               paper={{
                                 ...paper,
-                                citations: 0,
-                                impact: "low",
-                                url: "",
-                                topics: [],
-                                category: categories.find(c => c.id === paper.category_id)
+                                citations: paper.citations || 0,
+                                impact: paper.impact || "low",
+                                url: paper.url || "",
+                                topics: paper.topics || [],
+                                category: categories.find(c => c.id === paper.category_id),
+                                in_reading_list: readingList.some(item => item.paper_id === paper.id),
+                                scheduled_date: paper.scheduled_date,
+                                estimated_time: paper.estimated_time,
+                                repeat: paper.repeat
                               }}
                               onAddToList={async () => {
                                 const result = await addToReadingList(paper.id);
@@ -496,6 +511,10 @@ export default function LibraryPage() {
                                 handleSchedulePaper(paper.id, date, estimatedTime, repeat)
                               }
                               isLoading={isLoading}
+                              context="main"
+                              showScheduleButton={!readingList.some(item => item.paper_id === paper.id)}
+                              showAddToListButton={!readingList.some(item => item.paper_id === paper.id)}
+                              variant={viewMode === "list" ? "default" : "compact"}
                             />
                           </motion.div>
                         ))}

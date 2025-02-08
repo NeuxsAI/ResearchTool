@@ -24,6 +24,7 @@ import { extractTextFromPDF } from "@/lib/pdf/extract-text";
 import { parsePaperContent } from "@/lib/ai/paper-parser";
 import { createClient } from "@/lib/supabase/client";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useCategories } from "@/lib/context/categories-context";
 
 interface AddPaperDialogProps {
   open: boolean;
@@ -41,6 +42,8 @@ export function AddPaperDialog({ open, onOpenChange, categoryId, onPaperAdded }:
   const [year, setYear] = useState("");
   const [abstract, setAbstract] = useState("");
   const [activeTab, setActiveTab] = useState<"upload" | "url">("upload");
+  const [selectedCategory, setSelectedCategory] = useState<string>(categoryId || "");
+  const { categories } = useCategories();
   const router = useRouter();
 
   const processFile = async (file: File) => {
@@ -144,8 +147,8 @@ export function AddPaperDialog({ open, onOpenChange, categoryId, onPaperAdded }:
       if (abstract) {
         formData.append('abstract', abstract);
       }
-      if (categoryId) {
-        formData.append('categoryId', categoryId);
+      if (categoryId || selectedCategory) {
+        formData.append('categoryId', categoryId || selectedCategory);
       }
 
       // Log the data being sent
@@ -154,7 +157,7 @@ export function AddPaperDialog({ open, onOpenChange, categoryId, onPaperAdded }:
         authors: authorsList,
         year,
         abstract,
-        categoryId,
+        categoryId: categoryId || selectedCategory,
         hasFile: !!file,
         fileName: file?.name,
         fileSize: file?.size,
@@ -288,6 +291,23 @@ export function AddPaperDialog({ open, onOpenChange, categoryId, onPaperAdded }:
                         className="h-20 text-[11px] bg-[#2a2a2a] border-[#333] text-white placeholder:text-[#666] resize-none"
                       />
                     </div>
+                    {!categoryId && (
+                      <div className="space-y-2">
+                        <Label htmlFor="category" className="text-[11px] text-[#888]">Category (optional)</Label>
+                        <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                          <SelectTrigger className="h-7 text-[11px] bg-[#2a2a2a] border-[#333] text-white">
+                            <SelectValue placeholder="Select a category" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {categories.map((category) => (
+                              <SelectItem key={category.id} value={category.id}>
+                                {category.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -357,6 +377,23 @@ export function AddPaperDialog({ open, onOpenChange, categoryId, onPaperAdded }:
                         className="h-20 text-[11px] bg-[#2a2a2a] border-[#333] text-white placeholder:text-[#666] resize-none"
                       />
                     </div>
+                    {!categoryId && (
+                      <div className="space-y-2">
+                        <Label htmlFor="category" className="text-[11px] text-[#888]">Category (optional)</Label>
+                        <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                          <SelectTrigger className="h-7 text-[11px] bg-[#2a2a2a] border-[#333] text-white">
+                            <SelectValue placeholder="Select a category" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {categories.map((category) => (
+                              <SelectItem key={category.id} value={category.id}>
+                                {category.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

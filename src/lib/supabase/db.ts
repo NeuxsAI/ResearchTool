@@ -1,6 +1,6 @@
 import { createClient as createServerClient } from './server'
 import { createClient as createBrowserClient } from './client'
-import type { Category, Paper, Annotation, Board, BoardItem, ReadingListItem, DbResult, DbArrayResult } from '@/lib/supabase/types'
+import type { Category, Paper, Annotation, Board, BoardItem, ReadingListItem, DbResult, DbArrayResult, DiscoveredPaper } from '@/lib/supabase/types'
 
 // Categories
 export async function getCategories(): Promise<DbArrayResult<Category>> {
@@ -128,45 +128,65 @@ export async function addPaperFromDiscovery(
 ): Promise<DbResult<Paper>> {
   const supabase = createBrowserClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('User not authenticated');
+  if (!user) return { data: null, error: new Error('User not authenticated') };
 
-  // Create paper with discovery data
-  const paperData = {
-    ...paper,
-    category_id: categoryId,
-    user_id: user.id,
-    citations: paper.citations ?? 0,
-    impact: paper.impact ?? 'low',
-    topics: paper.topics ?? [],
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  };
+  try {
+    // Generate a new UUID for the paper
+    const { data: { id: paperId } } = await supabase.rpc('generate_uuid');
 
-  // First create the paper
-  const { data: createdPaper, error: paperError } = await supabase
-    .from('papers')
-    .insert(paperData)
-    .select()
-    .single();
-
-  if (paperError) return { data: null, error: paperError };
-  if (!createdPaper) return { data: null, error: new Error('Failed to create paper') };
-
-  // Then add it to reading list
-  const { error: readingListError } = await supabase
-    .from('reading_list')
-    .insert({
-      paper_id: createdPaper.id,
+    // Create paper with discovery data
+    const paperData = {
+      id: paperId,
+      title: paper.title,
+      authors: paper.authors,
+      year: paper.year,
+      abstract: paper.abstract || '',
+      url: paper.url,
+      citations: paper.citations || 0,
+      impact: paper.impact || 'low',
+      topics: paper.topics || [],
+      category_id: categoryId,
       user_id: user.id,
-      added_at: new Date().toISOString(),
-    });
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
 
-  if (readingListError) {
-    console.error('Failed to add paper to reading list:', readingListError);
-    // We don't return here since the paper was created successfully
+    // First create the paper
+    const { data: createdPaper, error: paperError } = await supabase
+      .from('papers')
+      .insert(paperData)
+      .select()
+      .single();
+
+    if (paperError) {
+      console.error('Failed to create paper:', paperError);
+      return { data: null, error: new Error(paperError.message) };
+    }
+
+    if (!createdPaper) {
+      return { data: null, error: new Error('Failed to create paper: No data returned') };
+    }
+
+    // Then add it to reading list
+    const { error: readingListError } = await supabase
+      .from('reading_list')
+      .insert({
+        paper_id: createdPaper.id,
+        user_id: user.id,
+        added_at: new Date().toISOString(),
+      });
+
+    if (readingListError) {
+      console.error('Failed to add paper to reading list:', readingListError);
+      // Even if reading list fails, we return the created paper
+      return { data: createdPaper, error: new Error('Paper created but failed to add to reading list: ' + readingListError.message) };
+    }
+
+    return { data: createdPaper, error: null };
+  } catch (error) {
+    console.error('Error in addPaperFromDiscovery:', error);
+    return { data: null, error: error instanceof Error ? error : new Error('Unknown error occurred') };
   }
-
-  return { data: createdPaper, error: null };
 }
 
 export async function updatePaper(
@@ -552,4 +572,122 @@ export async function getPapersWithDiscoveryData(): Promise<DbArrayResult<Paper>
     `)
     .eq('user_id', user.id)
     .order('citations', { ascending: false });
+}
+
+export async function trackPaperInteraction(
+  paperId: string,
+  action: 'view' | 'read' | 'schedule' | 'annotate' | 'complete',
+  metadata?: any
+) {
+  try {
+    const supabase = createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session?.user) {
+      throw new Error('Not authenticated');
+    }
+
+    const { error } = await supabase
+      .from('paper_interactions')
+      .insert({
+        user_id: session.user.id,
+        paper_id: paperId,
+        action,
+        metadata: metadata || null
+      });
+
+    if (error) throw error;
+    return { error: null };
+  } catch (error) {
+    console.error('Error tracking paper interaction:', error);
+    return { error };
+  }
+}
+
+// Function to get user's paper interactions
+export async function getUserPaperInteractions(limit?: number) {
+  try {
+    const supabase = createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session?.user) {
+      throw new Error('Not authenticated');
+    }
+
+    let query = supabase
+      .from('paper_interactions')
+      .select(`
+        *,
+        paper:papers(*)
+      `)
+      .eq('user_id', session.user.id)
+      .order('created_at', { ascending: false });
+
+    if (limit) {
+      query = query.limit(limit);
+    }
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+    return { data, error: null };
+  } catch (error) {
+    console.error('Error getting paper interactions:', error);
+    return { data: null, error };
+  }
+}
+
+// Discovered Papers
+export async function getDiscoveredPapers(type: 'recommended' | 'trending'): Promise<DbArrayResult<DiscoveredPaper>> {
+  const supabase = createBrowserClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { data: [], error: null };
+
+  const source = type === 'trending' ? 'trending_search' : 'recommendations';
+
+  const { data, error } = await supabase
+    .from('discovered_papers')
+    .select('*')
+    .eq('user_id', user.id)
+    .eq('source', source)
+    .order('discovered_at', { ascending: false });
+
+  if (error) {
+    console.error('Error getting papers:', error);
+  }
+
+  return { data, error };
+}
+
+export async function storeDiscoveredPapers(
+  papers: Omit<DiscoveredPaper, 'user_id'>[]
+): Promise<DbArrayResult<DiscoveredPaper>> {
+  const supabase = createBrowserClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { data: [], error: null };
+
+  try {
+    const { data, error } = await supabase
+      .from('discovered_papers')
+      .insert(papers.map(paper => ({
+        ...paper,
+        user_id: user.id
+      })))
+      .select();
+
+    if (error) {
+      console.error('Supabase error details:', error);
+      return { data: null, error };
+    }
+
+    if (!data || data.length === 0) {
+      console.error('No data returned from insert');
+      return { data: null, error: new Error('Failed to store papers') };
+    }
+
+    return { data, error: null };
+  } catch (error) {
+    console.error('Error storing papers:', error);
+    return { data: null, error: error instanceof Error ? error : new Error('Unknown error occurred') };
+  }
 } 

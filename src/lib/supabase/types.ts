@@ -85,4 +85,20 @@ export interface DbResult<T> {
 export interface DbArrayResult<T> {
   data: T[] | null;
   error: Error | null;
+}
+
+export interface DiscoveredPaper {
+  id: string;
+  title: string;
+  abstract?: string;
+  authors: string[];
+  year: number;
+  citations?: number;
+  impact?: 'high' | 'low';
+  url?: string;
+  topics?: string[];
+  source: string;
+  user_id: string;
+  created_at: string;
+  metadata?: any;
 } 
