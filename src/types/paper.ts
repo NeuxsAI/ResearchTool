@@ -8,6 +8,7 @@ export interface Paper {
   institution?: string;
   impact: "high" | "low";
   url: string;
+  arxiv_id?: string;
   topics: string[];
   source?: string;
   created_at?: string;

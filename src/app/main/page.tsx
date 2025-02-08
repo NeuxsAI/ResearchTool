@@ -396,35 +396,8 @@ export default function LibraryPage() {
               </div>
             </div>
 
-            {/* Recent Annotations */}
-            <div className="mb-6">
-              <h4 className="text-xs font-medium text-[#888] mb-2">
-                Recent Annotations
-              </h4>
-              <div className="space-y-2">
-                {recentAnnotations.map(annotation => {
-                  const paper = papers.find(p => p.id === annotation.paper_id);
-                  if (!paper) return null;
-                  return (
-                    <div 
-                      key={annotation.id} 
-                      className="space-y-1 hover:bg-[#2a2a2a] p-1.5 rounded cursor-pointer transition-colors group"
-                      onClick={() => handlePaperClick(paper)}
-                    >
-                      <p className="text-[11px] text-slate-100 group-hover:text-white line-clamp-2">
-                        {annotation.content}
-                      </p>
-                      <p className="text-[10px] text-[#666] group-hover:text-[#888]">
-                        on {paper.title}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Active Chats */}
-            <div>
+                        {/* Active Chats */}
+                        <div>
               <h4 className="text-xs font-medium text-[#888] mb-2">
                 Active Conversations
               </h4>
@@ -453,6 +426,33 @@ export default function LibraryPage() {
                       </div>
                     );
                   })}
+              </div>
+            </div>
+
+            {/* Recent Annotations */}
+            <div className="mt-6">
+              <h4 className="text-xs font-medium text-[#888] mb-2">
+                Recent Annotations
+              </h4>
+              <div className="space-y-2">
+                {recentAnnotations.map(annotation => {
+                  const paper = papers.find(p => p.id === annotation.paper_id);
+                  if (!paper) return null;
+                  return (
+                    <div 
+                      key={annotation.id} 
+                      className="space-y-1 hover:bg-[#2a2a2a] p-1.5 rounded cursor-pointer transition-colors group"
+                      onClick={() => handlePaperClick(paper)}
+                    >
+                      <p className="text-[11px] text-slate-100 group-hover:text-white line-clamp-2">
+                        {annotation.content}
+                      </p>
+                      <p className="text-[10px] text-[#666] group-hover:text-[#888]">
+                        on {paper.title}
+                      </p>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>

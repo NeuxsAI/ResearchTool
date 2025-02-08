@@ -66,17 +66,17 @@ export function PDFViewer({ url, onSelection, annotations = [] }: PDFViewerProps
 
     async function loadPDF() {
       try {
-        // Extract arxiv ID from the URL
-        const arxivId = url.split('/').pop()?.replace('.pdf', '');
-        if (!arxivId) {
-          throw new Error('Invalid PDF URL');
-        }
-
-        // Use our proxy endpoint
-        const proxyUrl = `/api/papers/${arxivId}/pdf`;
-        console.log('Loading PDF through proxy:', proxyUrl);
+        // Use the URL directly since it's already the PDF endpoint
+        console.log('Loading PDF:', url);
         
-        const pdf = await pdfjsLib.getDocument(proxyUrl).promise;
+        const loadingTask = pdfjsLib.getDocument({
+          url: url,
+          withCredentials: true,
+          cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/cmaps/',
+          cMapPacked: true,
+        });
+        
+        const pdf = await loadingTask.promise;
         if (!mounted) return;
         
         pdfRef.current = pdf;
