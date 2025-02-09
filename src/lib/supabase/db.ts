@@ -3,6 +3,61 @@ import { createClient as createBrowserClient } from './client'
 import type { Category, Paper, Annotation, Board, BoardItem, ReadingListItem, DbResult, DbArrayResult, DiscoveredPaper } from '@/lib/supabase/types'
 import { cache, CACHE_KEYS } from '../cache'
 
+export type Database = {
+  public: {
+    Tables: {
+      annotations: {
+        Row: {
+          id: string;
+          content: string;
+          paper_id: string;
+          highlight_text?: string;
+          created_at: string;
+          updated_at: string;
+          chat_history?: Array<{
+            role: "user" | "assistant" | "system";
+            content: string;
+            timestamp: string;
+            annotationId?: string;
+            highlightText?: string;
+            isStreaming?: boolean;
+          }>;
+        };
+        Insert: {
+          id?: string;
+          content: string;
+          paper_id: string;
+          highlight_text?: string;
+          created_at?: string;
+          updated_at?: string;
+          chat_history?: Array<{
+            role: "user" | "assistant" | "system";
+            content: string;
+            timestamp: string;
+            annotationId?: string;
+            highlightText?: string;
+            isStreaming?: boolean;
+          }>;
+        };
+        Update: {
+          content?: string;
+          highlight_text?: string;
+          updated_at?: string;
+          chat_history?: Array<{
+            role: "user" | "assistant" | "system";
+            content: string;
+            timestamp: string;
+            annotationId?: string;
+            highlightText?: string;
+            isStreaming?: boolean;
+          }>;
+        };
+      };
+      // ... other tables ...
+    };
+  };
+};
+
 // Categories
 export async function getCategories(): Promise<DbArrayResult<Category>> {
   const cachedCategories = cache.get(CACHE_KEYS.CATEGORIES)
@@ -258,23 +313,15 @@ export async function getAnnotationsByPaper(paperId: string): Promise<DbArrayRes
   return result;
 }
 
-export async function createAnnotation(annotation: Partial<Annotation>): Promise<DbResult<Annotation>> {
+export async function createAnnotation(annotation: Database['public']['Tables']['annotations']['Insert']): Promise<DbResult<Annotation>> {
   const supabase = createBrowserClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('User not authenticated');
   
-  console.log("Creating annotation with:", {
-    ...annotation,
-    user_id: user.id
-  });
-  
-  const result = await supabase.from('annotations').insert({
+  return await supabase.from('annotations').insert({
     ...annotation,
     user_id: user.id
   }).select().single();
-  
-  console.log("Supabase response:", result);
-  return result;
 }
 
 export async function updateAnnotation(id: string, annotation: Partial<Annotation>): Promise<DbResult<Annotation>> {

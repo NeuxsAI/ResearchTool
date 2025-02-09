@@ -6,12 +6,25 @@ type CacheEntry<T> = {
   expiresIn: number;
 };
 
-class Cache {
+export interface ICache {
+  get: (key: string) => any;
+  set: (key: string, value: any) => void;
+  delete: (key: string) => void;
+}
+
+export class Cache implements ICache {
   private static instance: Cache;
   private cache: Map<string, CacheEntry<any>> = new Map();
-  private readonly DEFAULT_EXPIRY = 5 * 60 * 1000; // 5 minutes
+  private timeouts: Map<string, NodeJS.Timeout> = new Map();
+  private config: {
+    expiresIn: number;
+  };
 
-  private constructor() {}
+  private constructor(config?: { expiresIn: number }) {
+    this.config = {
+      expiresIn: config?.expiresIn || 5 * 60 * 1000 // 5 minutes default
+    };
+  }
 
   static getInstance(): Cache {
     if (!Cache.instance) {
@@ -20,7 +33,7 @@ class Cache {
     return Cache.instance;
   }
 
-  set<T>(key: string, data: T, expiresIn: number = this.DEFAULT_EXPIRY): void {
+  set<T>(key: string, data: T, expiresIn: number = this.config.expiresIn): void {
     this.cache.set(key, {
       data,
       timestamp: Date.now(),
@@ -46,6 +59,10 @@ class Cache {
 
   invalidateAll(): void {
     this.cache.clear();
+  }
+
+  delete(key: string): void {
+    this.cache.delete(key);
   }
 }
 

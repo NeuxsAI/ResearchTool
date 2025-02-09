@@ -37,13 +37,17 @@ export interface Annotation {
   content: string;
   paper_id: string;
   user_id: string;
-  highlight_text?: string;
-  position?: {
-    x: number;
-    y: number;
-  };
   created_at: string;
   updated_at: string;
+  highlight_text?: string;
+  chat_history?: Array<{
+    role: "user" | "assistant" | "system";
+    content: string;
+    timestamp: string;
+    annotationId?: string;
+    highlightText?: string;
+    isStreaming?: boolean;
+  }>;
 }
 
 export interface Board {

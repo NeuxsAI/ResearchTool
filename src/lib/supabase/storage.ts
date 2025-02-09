@@ -23,7 +23,41 @@ export async function uploadPDF(file: File, userId: string, token: string) {
     .from('papers')
     .getPublicUrl(fileName);
   return publicUrl;
-} 
+}
+
+export async function downloadAndUploadPDF(url: string, userId: string, paperId: string) {
+  const supabase = createClient();
+  
+  try {
+    // Download the PDF
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Failed to download PDF');
+    
+    const pdfBlob = await response.blob();
+    const fileName = `${userId}/${paperId}/paper.pdf`;
+
+    // Upload to Supabase storage
+    const { error: uploadError } = await supabase.storage
+      .from(PAPERS_BUCKET)
+      .upload(fileName, pdfBlob, {
+        contentType: 'application/pdf',
+        cacheControl: '3600',
+        upsert: true
+      });
+
+    if (uploadError) throw uploadError;
+
+    // Get the public URL
+    const { data: { publicUrl } } = supabase.storage
+      .from(PAPERS_BUCKET)
+      .getPublicUrl(fileName);
+
+    return publicUrl;
+  } catch (error) {
+    console.error('Error downloading/uploading PDF:', error);
+    throw error;
+  }
+}
 
 export async function getPDFUrl(paperId: string) {
   const supabase = createClient();

@@ -65,18 +65,12 @@ export function MainLayout({ children }: MainLayoutProps) {
     <div className="flex h-screen bg-[#1c1c1c]">
       {/* Sidebar */}
       <aside className="w-52 border-r border-[#2a2a2a] flex flex-col bg-[#1c1c1c]">
-        <div className="p-2 border-b border-[#2a2a2a]">
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="text-[11px] font-medium px-2 text-[#888]">My Library</h2>
-            {!isUserLoading && user && <ProfileMenu user={user} />}
+        <div className="p-3 border-b border-[#2a2a2a] flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Library className="h-4 w-4 text-violet-500" />
+            <span className="text-sm font-medium text-white">Nexus</span>
           </div>
-          <div className="relative">
-            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-[#666]" />
-            <Input 
-              placeholder="Search..." 
-              className="h-6 pl-7 text-[11px] bg-[#2a2a2a] border-[#333] placeholder:text-[#666]"
-            />
-          </div>
+          {!isUserLoading && user && <ProfileMenu user={user} />}
         </div>
 
         <div className="flex-1 overflow-auto">

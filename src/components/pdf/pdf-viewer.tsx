@@ -43,11 +43,13 @@ interface PDFViewerProps {
   onSelection?: (text: string) => void;
   annotations?: Array<{
     id: string;
+    content: string;
     highlight_text?: string;
   }>;
+  onAnnotationClick?: (annotationId: string) => void;
 }
 
-export function PDFViewer({ url, onSelection, annotations = [] }: PDFViewerProps) {
+export function PDFViewer({ url, onSelection, annotations = [], onAnnotationClick }: PDFViewerProps) {
   const [numPages, setNumPages] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const pdfRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null);
@@ -71,7 +73,6 @@ export function PDFViewer({ url, onSelection, annotations = [] }: PDFViewerProps
         
         const loadingTask = pdfjsLib.getDocument({
           url: url,
-          withCredentials: true,
           cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/cmaps/',
           cMapPacked: true,
         });
@@ -164,6 +165,7 @@ export function PDFViewer({ url, onSelection, annotations = [] }: PDFViewerProps
 
     const highlightAnnotations = (textLayerDiv: HTMLElement, annotation: {
       id: string;
+      content: string;
       highlight_text?: string;
     }) => {
       if (!annotation.highlight_text) {

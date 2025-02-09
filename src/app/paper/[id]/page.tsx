@@ -411,7 +411,7 @@ export default function PaperPage() {
           {paper?.url ? (
             <div onClick={handleContainerClick} className="h-full relative">
               <PDFViewer 
-                url={`/api/papers/${paper.id}/pdf`}
+                url={paper.url}
                 onSelection={handleTextSelection}
                 annotations={annotations}
                 onAnnotationClick={handleAnnotationClick}
