@@ -2,10 +2,12 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { uploadPDF } from '@/lib/supabase/storage';
 import { createPaper } from '@/lib/supabase/db';
+import { cookies } from 'next/headers';
 
 export async function POST(request: Request) {
   try {
-    const supabase = createClient();
+    const cookieStore = cookies();
+    const supabase = createClient(cookieStore);
     
     // Get auth token from request header
     const authHeader = request.headers.get('Authorization');
