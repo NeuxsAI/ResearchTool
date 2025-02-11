@@ -7,44 +7,43 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Star, TrendingUp, Loader2, BookOpen, FileText, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { toast } from "sonner";
-import { addPaperFromDiscovery } from "@/lib/supabase/db";
 import { useRouter } from "next/navigation";
 import { Paper } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence } from "framer-motion";
 import { addToReadingList } from "@/lib/supabase/db";
 import { cache, CACHE_KEYS } from '@/lib/cache';
+import { PaperCard } from "@/components/paper-card";
+import { createClient } from "@/lib/supabase/client";
 
 // Preload function for parallel data fetching
 async function preloadPapers(refresh = false) {
   const cachedRecommended = !refresh && cache.get(CACHE_KEYS.RECOMMENDED_PAPERS);
   const cachedTrending = !refresh && cache.get(CACHE_KEYS.TRENDING_PAPERS);
 
+  if (cachedRecommended && cachedTrending) {
+    return {
+      recommended: cachedRecommended,
+      trending: cachedTrending
+    };
+  }
+
   const [recommendedResponse, trendingResponse] = await Promise.all([
-    cachedRecommended ? 
-      { ok: true, papers: cachedRecommended } : 
-      fetch(`/api/papers/discover${refresh ? '?refresh=true' : ''}`).then(r => r.json()),
-    cachedTrending ? 
-      { ok: true, papers: cachedTrending } : 
-      fetch(`/api/papers/trending${refresh ? '?refresh=true' : ''}`).then(r => r.json())
+    fetch(`/api/papers/discover${refresh ? '?refresh=true' : ''}`).then(r => r.json()),
+    fetch(`/api/papers/trending${refresh ? '?refresh=true' : ''}`).then(r => r.json())
   ]);
 
+  const recommended = recommendedResponse.papers || [];
+  const trending = trendingResponse.papers || [];
+
   if (!refresh) {
-    if (recommendedResponse.papers) {
-      cache.set(CACHE_KEYS.RECOMMENDED_PAPERS, recommendedResponse.papers);
-    }
-    if (trendingResponse.papers) {
-      cache.set(CACHE_KEYS.TRENDING_PAPERS, trendingResponse.papers);
-    }
-  } else {
-    // Clear cache when refreshing
-    cache.delete(CACHE_KEYS.RECOMMENDED_PAPERS);
-    cache.delete(CACHE_KEYS.TRENDING_PAPERS);
+    cache.set(CACHE_KEYS.RECOMMENDED_PAPERS, recommended);
+    cache.set(CACHE_KEYS.TRENDING_PAPERS, trending);
   }
 
   return {
-    recommended: recommendedResponse.papers || [],
-    trending: trendingResponse.papers || []
+    recommended,
+    trending
   };
 }
 
@@ -77,7 +76,17 @@ export default function DiscoverPage() {
   };
 
   useEffect(() => {
-    loadPapers(false);
+    // Try to load from cache first
+    const cachedRecommended = cache.get<Paper[]>(CACHE_KEYS.RECOMMENDED_PAPERS);
+    const cachedTrending = cache.get<Paper[]>(CACHE_KEYS.TRENDING_PAPERS);
+    
+    if (cachedRecommended && cachedTrending) {
+      setPapers(cachedRecommended);
+      setTrendingPapers(cachedTrending);
+      setIsLoading(false);
+    } else {
+      loadPapers(false);
+    }
   }, []);
 
   const handleRefresh = async () => {
@@ -87,39 +96,53 @@ export default function DiscoverPage() {
   const handleAddPaper = async (paper: Paper) => {
     setAddingPaperId(paper.id);
     try {
-      const result = await addToReadingList(paper.id, {
-        title: paper.title,
-        authors: paper.authors,
-        year: paper.year,
-        abstract: paper.abstract,
-        url: paper.url,
-        citations: paper.citations,
-        impact: paper.impact,
-        topics: paper.topics
+      // Get auth token
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error('Not authenticated');
+      }
+
+      // Create form data - same as add-paper-dialog
+      const formData = new FormData();
+      formData.append('title', paper.title);
+      formData.append('authors', JSON.stringify(paper.authors));
+      formData.append('year', paper.year.toString());
+      formData.append('abstract', paper.abstract || '');
+      formData.append('url', paper.url || '');
+      if (paper.arxiv_id) {
+        formData.append('arxiv_id', paper.arxiv_id);
+      }
+
+      // Submit to API route - same as add-paper-dialog
+      const response = await fetch('/api/papers', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: formData
       });
-      
-      if (result.error) {
-        throw result.error;
-      }
-      
-      // Show success message
-      toast.success("Paper has been added to your library");
 
-      // Update the paper's state in the appropriate list
-      const updatePaperList = (papers: Paper[]) => 
-        papers.map(p => p.id === paper.id ? { ...p, in_reading_list: true } : p);
-
-      if (activeTab === "recommended") {
-        setPapers(updatePaperList);
-      } else {
-        setTrendingPapers(updatePaperList);
+      if (!response.ok) {
+        const data = await response.json();
+        console.error('Failed to create paper:', data);
+        throw new Error(data.error || 'Failed to create paper');
       }
 
-      // Navigate to the paper page
-      router.push(`/paper/${paper.id}`);
+      const data = await response.json();
+
+      // Then add it to the reading list
+      const result = await addToReadingList(data.paper.id);
+
+      if (!result.data) {
+        throw new Error('Failed to add paper to reading list');
+      }
+
+      toast.success('Paper added to library');
+      router.push(`/paper/${data.paper.id}`);
     } catch (error) {
       console.error('Error adding paper:', error);
-      toast.error("Failed to add paper to library");
+      toast.error(error instanceof Error ? error.message : 'Failed to add paper');
     } finally {
       setAddingPaperId(null);
     }
@@ -166,99 +189,26 @@ export default function DiscoverPage() {
         opacity: { duration: 0.2 }
       }}
     >
-      <Card 
-        className="max-h-[500px] bg-[#1c1c1c] border-[#2a2a2a] overflow-auto cursor-pointer hover:border-[#3a3a3a] transition-colors"
-        onClick={() => router.push(`/paper/${paper.id}`)}
-      >
-        <div className="sticky top-0 z-10 bg-[#1c1c1c] p-4 border-b border-[#2a2a2a]">
-          <div className="flex items-center gap-2 flex-wrap mb-2">
-            <span className="text-[11px] text-[#666]">{paper.year}</span>
-            <span className="text-[11px] text-[#666]">•</span>
-            <span className="text-[11px] text-[#666]">{paper.citations} citations</span>
-            <Badge 
-              variant="secondary" 
-              className={
-                paper.impact === "high"
-                  ? "bg-violet-500/10 text-violet-500 hover:bg-violet-500/20"
-                  : "bg-blue-500/10 text-blue-500 hover:bg-blue-500/20"
-              }
-            >
-              {paper.impact === "high" ? "High Impact" : "Low Impact"}
-            </Badge>
-          </div>
-          
-          <h3 className="text-lg font-medium text-white mb-2">
-            {paper.title}
-          </h3>
-          
-          <p className="text-sm text-[#888]">
-            {paper.authors.join(", ")}
-          </p>
-        </div>
-        
-        <div className="p-4">
-          {paper.abstract && (
-            <div className="mb-4">
-              <h4 className="text-sm font-medium text-white mb-1.5">Abstract</h4>
-              <p className="text-sm text-[#888] leading-relaxed mb-16">
-                {paper.abstract}
-              </p>
-            </div>
-          )}
-          
-          <div>
-            <h4 className="text-sm font-medium text-white mb-1.5">Topics</h4>
-            <div className="flex flex-wrap gap-1">
-              {paper.topics.map((topic, i) => (
-                <Badge
-                  key={i}
-                  variant="secondary"
-                  className="bg-[#2a2a2a] text-[#888] text-xs px-2 py-0.5"
-                >
-                  {topic}
-                </Badge>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="sticky bottom-0 bg-[#1c1c1c] border-t border-[#2a2a2a] p-2 flex gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="flex-1 h-8 text-xs text-[#888] hover:text-white hover:bg-[#333]"
-            onClick={() => handleAddPaper(paper)}
-            disabled={addingPaperId === paper.id || paper.in_reading_list}
-          >
-            {addingPaperId === paper.id ? (
-              <>
-                <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                Adding to Library...
-              </>
-            ) : paper.in_reading_list ? (
-              <>
-                <FileText className="h-3.5 w-3.5 mr-1.5" />
-                In Library
-              </>
-            ) : (
-              <>
-                <BookOpen className="h-3.5 w-3.5 mr-1.5" />
-                Add to Library
-              </>
-            )}
-          </Button>
-        </div>
-      </Card>
+      <PaperCard
+        paper={paper}
+        onAddToLibrary={() => handleAddPaper(paper)}
+        isAdding={addingPaperId === paper.id}
+        context="discover"
+        variant="default"
+        showScheduleButton={false}
+        showCategoryButton={false}
+        className="max-h-[500px]"
+      />
     </motion.div>
   );
 
   return (
     <MainLayout>
-      <div className="h-full bg-[#1c1c1c]">
-        <div className="p-6 border-b border-[#2a2a2a]">
+      <div className="h-full bg-[#030014]">
+        <div className="p-6 border-b border-[#1a1f2e]">
           <div className="max-w-3xl">
             <h1 className="text-xl font-semibold text-white mb-2">Discover</h1>
-            <p className="text-sm text-[#888]">
+            <p className="text-sm text-[#4a5578]">
               Discover trending and recommended papers based on your interests.
             </p>
           </div>
@@ -274,17 +224,17 @@ export default function DiscoverPage() {
             }}
           >
             <div className="flex items-center justify-between mb-4">
-              <TabsList className="h-9 bg-[#1c1c1c] border border-[#2a2a2a] p-1 items-center mx-auto">
+              <TabsList className="h-9 bg-[#030014] border border-[#1a1f2e] p-1 items-center mx-auto">
                 <TabsTrigger 
                   value="recommended" 
-                  className="h-7 px-4 text-xs data-[state=active]:bg-[#2a2a2a]"
+                  className="h-7 px-4 text-xs data-[state=active]:bg-[#1a1f2e]"
                 >
                   <Star className="h-3.5 w-3.5 mr-2" />
                   Recommended
                 </TabsTrigger>
                 <TabsTrigger 
                   value="trending" 
-                  className="h-7 px-4 text-xs data-[state=active]:bg-[#2a2a2a]"
+                  className="h-7 px-4 text-xs data-[state=active]:bg-[#1a1f2e]"
                 >
                   <TrendingUp className="h-3.5 w-3.5 mr-2" />
                   Trending
@@ -296,7 +246,7 @@ export default function DiscoverPage() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 rounded-full bg-[#2a2a2a] hover:bg-[#333] shrink-0 mr-4"
+                className="h-8 w-8 rounded-full bg-[#1a1f2e] hover:bg-[#2a3142] shrink-0 mr-4"
                 onClick={() => paginate(-1)}
               >
                 <ChevronLeft className="h-4 w-4 text-white" />
@@ -304,7 +254,7 @@ export default function DiscoverPage() {
 
               <div className="relative h-[400px] flex-1">
                 {isLoading ? (
-                  <Card className="h-full bg-[#1c1c1c] border-[#2a2a2a] animate-pulse p-4">
+                  <Card className="h-full bg-[#030014] border-[#2a2a2a] animate-pulse p-4">
                     <div className="p-4">
                       <div className="h-4 bg-[#2a2a2a] rounded w-1/4 mb-2" />
                       <div className="h-6 bg-[#2a2a2a] rounded w-3/4 mb-2" />
@@ -326,7 +276,7 @@ export default function DiscoverPage() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 rounded-full bg-[#2a2a2a] hover:bg-[#333] shrink-0 ml-4"
+                className="h-8 w-8 rounded-full bg-[#1a1f2e] hover:bg-[#2a3142] shrink-0 ml-4"
                 onClick={() => paginate(1)}
               >
                 <ChevronRight className="h-4 w-4 text-white" />

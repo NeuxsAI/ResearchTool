@@ -62,7 +62,7 @@ export function EditPaperDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px] bg-[#1c1c1c] text-white border-[#333]">
+      <DialogContent className="sm:max-w-[425px] bg-[#030014] text-white border-[#333]">
         <DialogHeader>
           <DialogTitle>Edit Paper Details</DialogTitle>
           <DialogDescription className="text-[#888]">
@@ -104,7 +104,7 @@ export function EditPaperDialog({
             <Button
               type="submit"
               disabled={isLoading}
-              className="bg-[#2a2a2a] hover:bg-[#333] text-white"
+              className="bg-[#1a1f2e] hover:bg-[#2a3142] text-white"
             >
               {isLoading ? "Saving..." : "Save changes"}
             </Button>

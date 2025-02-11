@@ -1,4 +1,4 @@
-import { BookMarked, FileText, Star, Calendar, Trash2, BookOpen, Loader2 } from "lucide-react";
+import { BookMarked, FileText, Star, Calendar, Trash2, BookOpen, Loader2, MoreVertical, Pencil, MessageSquare, Plus } from "lucide-react";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
@@ -11,9 +11,11 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Paper } from "@/lib/types";
 import { useRouter } from "next/navigation";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Annotation } from "@/lib/types";
 
 
-interface PaperCardProps {
+export interface PaperCardProps {
   paper: Paper;
   onAddToList?: () => void;
   onSchedule?: (date: Date, estimatedTime?: number, repeat?: "daily" | "weekly" | "monthly" | "none") => void;
@@ -24,9 +26,11 @@ interface PaperCardProps {
   showScheduleButton?: boolean;
   showCategoryButton?: boolean;
   showAddToListButton?: boolean;
-  context?: 'main' | 'reading-list' | 'discover';
-  onAddToLibrary?: (paper: Paper) => Promise<void>;
+  context?: 'main' | 'reading-list' | 'discover' | 'category' | 'search';
+  onAddToLibrary?: () => void;
   isAdding?: boolean;
+  className?: string;
+  annotations?: Annotation[];
 }
 
 export function PaperCard({ 
@@ -42,43 +46,84 @@ export function PaperCard({
   showAddToListButton = true,
   context = 'main',
   onAddToLibrary,
-  isAdding
+  isAdding,
+  className,
+  annotations = []
 }: PaperCardProps) {
   const router = useRouter();
-  const [date, setDate] = useState<Date>();
-  const [estimatedTime, setEstimatedTime] = useState<string>("");
-  const [repeat, setRepeat] = useState<"daily" | "weekly" | "monthly" | "none">("none");
+  const [date, setDate] = useState<Date | undefined>(() => 
+    paper.scheduled_date ? new Date(paper.scheduled_date) : undefined
+  );
+  const [estimatedTime, setEstimatedTime] = useState<string>(() => 
+    paper.estimated_time?.toString() || ""
+  );
+  const [repeat, setRepeat] = useState<"daily" | "weekly" | "monthly" | "none">(() => 
+    paper.repeat || "none"
+  );
   const [open, setOpen] = useState(false);
 
-  // Initialize scheduled state from paper prop
+  // Memoize state calculations to prevent unnecessary re-renders
   const isScheduled = !!paper.scheduled_date;
   const isInReadingList = paper.in_reading_list;
 
   // Determine button visibility based on context and paper state
   const shouldShowScheduleButton = showScheduleButton && (
     context === 'reading-list' || 
-    (!isInReadingList && context === 'discover') ||
-    (!isScheduled && context === 'main')
+    context === 'main' ||
+    (!isInReadingList && (context === 'discover' || context === 'search'))
   );
 
-  const shouldShowAddToListButton = showAddToListButton && !isInReadingList;
+  const shouldShowAddToListButton = showAddToListButton && !isInReadingList && context !== 'reading-list';
   const shouldShowCategoryButton = showCategoryButton && (isInReadingList || paper.category);
+  const shouldShowAddToLibrary = context === 'search' && !paper.in_reading_list;
 
-  const handleAddToList = (e: React.MouseEvent) => {
-    if (isLoading) return;
-    e.stopPropagation();
-    onAddToList?.();
+  // Handle estimated time validation
+  const handleEstimatedTimeChange = (value: string) => {
+    const numValue = parseInt(value);
+    if (value === "" || (!isNaN(numValue) && numValue > 0)) {
+      setEstimatedTime(value);
+    }
+  };
+
+  // Handle card click based on context
+  const handleCardClick = (e: React.MouseEvent) => {
+    // Don't navigate if clicking on interactive elements
+    if (
+      (e.target as HTMLElement).closest('button') ||
+      (e.target as HTMLElement).closest('[role="dialog"]') ||
+      (e.target as HTMLElement).closest('[role="listbox"]')
+    ) {
+      return;
+    }
+    
+    // Only navigate if the paper is in the library or if it's not a search result
+    if (paper.in_reading_list || context !== 'search') {
+      router.push(`/paper/${paper.id}`);
+    }
   };
 
   const handleSchedule = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (date && onSchedule) {
-      onSchedule(date, estimatedTime ? parseInt(estimatedTime) : undefined, repeat);
-      setOpen(false);
-    }
+    if (isLoading || !date || !onSchedule) return;
+    
+    const estimatedMinutes = estimatedTime ? parseInt(estimatedTime) : undefined;
+    onSchedule(date, estimatedMinutes, repeat);
+    setOpen(false);
   };
 
-  // Set initial date if paper is scheduled
+  const handleAddToList = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isLoading || !onAddToList) return;
+    onAddToList();
+  };
+
+  const handleAddToLibrary = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isLoading || isAdding || !onAddToLibrary) return;
+    onAddToLibrary();
+  };
+
+  // Update state when paper prop changes
   useEffect(() => {
     if (paper.scheduled_date) {
       setDate(new Date(paper.scheduled_date));
@@ -91,257 +136,237 @@ export function PaperCard({
     <motion.div 
       whileHover={{ scale: 0.995 }}
       whileTap={{ scale: 0.995 }}
+      className={className}
     >
       <Card 
-        className="bg-[#1c1c1c] border-[#2a2a2a] overflow-hidden cursor-pointer hover:border-[#3a3a3a] transition-all duration-200 group"
-        onClick={() => router.push(`/paper/${paper.id}`)}
+        className={cn(
+          "bg-[#0A192F] overflow-hidden cursor-pointer transition-all duration-200 group relative",
+          "hover:shadow-lg border-[#1E3A8A]/30",
+          variant === 'compact' 
+            ? 'p-3 flex flex-col min-h-[100px] max-h-[120px]' 
+            : 'p-4 flex flex-col min-h-[160px]',
+          className || ''
+        )}
+        onClick={handleCardClick}
       >
-        <div className="p-4">
-          <div className="flex items-center gap-2 flex-wrap mb-2">
+        {/* Top metadata row */}
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-1.5">
             <Badge 
               variant="secondary" 
-              className={
+              className={cn(
+                "px-1.5 py-0.5 font-medium rounded-md",
+                variant === 'compact' ? 'text-[9px]' : 'text-[10px]',
                 paper.impact === "high"
-                  ? "bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 text-xs font-medium"
-                  : "bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 text-xs font-medium"
-              }
+                  ? "bg-violet-500/10 text-violet-500 hover:bg-violet-500/20"
+                  : "bg-blue-500/10 text-blue-500 hover:bg-blue-500/20"
+              )}
             >
               {paper.impact === "high" ? "High Impact" : "Low Impact"}
             </Badge>
-            <div className="flex items-center gap-1.5 text-[#666]">
-              <span className="text-xs">{paper.year}</span>
-              <span className="text-xs">•</span>
-              <span className="text-xs">{paper.citations} citations</span>
+            <div className="flex items-center gap-1.5">
+              <span className={cn(
+                "text-[#4a5578]",
+                variant === 'compact' ? 'text-[9px]' : 'text-[10px]'
+              )}>{paper.year}</span>
+              <span className={cn(
+                "text-[#4a5578]",
+                variant === 'compact' ? 'text-[9px]' : 'text-[10px]'
+              )}>•</span>
+              <span className={cn(
+                "text-[#4a5578]",
+                variant === 'compact' ? 'text-[9px]' : 'text-[10px]'
+              )}>{paper.citations} citations</span>
             </div>
           </div>
-          
-          <h3 className="text-sm font-medium text-white mb-1.5 leading-snug group-hover:text-violet-400 transition-colors line-clamp-2">
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0 hover:bg-[#1E3A8A]/20 rounded-full"
+              >
+                <MoreVertical className="h-3.5 w-3.5 text-[#4a5578]" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-32 bg-[#0A192F] border-[#1E3A8A]">
+              {shouldShowCategoryButton && (
+                <DropdownMenuItem
+                  className="text-[#4a5578] hover:text-white hover:bg-[#1E3A8A]/20 cursor-pointer text-[11px]"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onChangeCategory?.();
+                  }}
+                >
+                  <Pencil className="h-3.5 w-3.5 mr-2" />
+                  Edit Category
+                </DropdownMenuItem>
+              )}
+              {onDelete && (
+                <DropdownMenuItem
+                  className="text-red-400 hover:text-red-300 hover:bg-red-900/20 cursor-pointer text-[11px]"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onDelete();
+                  }}
+                >
+                  <Trash2 className="h-3.5 w-3.5 mr-2" />
+                  Delete
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        {/* Main content */}
+        <div className="flex-1 flex flex-col min-h-0">
+          <h3 className={cn(
+            "font-medium leading-tight transition-colors mb-1",
+            variant === 'compact' 
+              ? 'text-xs line-clamp-2 text-[#E2E8F0] group-hover:text-[#38BDF8]' 
+              : 'text-sm line-clamp-2 text-[#F8FAFC] group-hover:text-[#60A5FA]'
+          )}>
             {paper.title}
           </h3>
           
-          <p className="text-xs text-[#888] mb-3 line-clamp-1">
+          <p className={cn(
+            "mb-2",
+            variant === 'compact' 
+              ? 'text-[9px] line-clamp-1 text-[#4a5578]' 
+              : 'text-xs line-clamp-1 text-[#4a5578]'
+          )}>
             {paper.authors.join(", ")}
           </p>
 
-          {paper.abstract && (
-            <p className="text-xs text-[#888] mb-3 line-clamp-2 leading-relaxed">
+          {paper.abstract && variant !== 'compact' && (
+            <p className="text-xs text-[#4a5578] line-clamp-2 leading-relaxed mb-3">
               {paper.abstract}
             </p>
           )}
           
-          <div className="flex flex-wrap items-center gap-1">
-            {paper.topics.slice(0, 3).map((topic, i) => (
-              <Badge
-                key={i}
-                variant="secondary"
-                className="bg-[#2a2a2a]/50 text-[#888] text-[10px] px-1.5 py-0"
-              >
-                {topic}
-              </Badge>
-            ))}
-            {paper.topics.length > 3 && (
-              <span className="text-[10px] text-[#666]">
-                +{paper.topics.length - 3} more
-              </span>
-            )}
-          </div>
-        </div>
+          {variant !== 'compact' && paper.topics.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1 mb-3">
+              {paper.topics.slice(0, 3).map((topic, i) => (
+                <Badge
+                  key={i}
+                  variant="secondary"
+                  className="bg-[#1E3A8A]/10 text-[#4a5578] text-[9px] px-1.5 py-0.5 rounded-md"
+                >
+                  {topic}
+                </Badge>
+              ))}
+              {paper.topics.length > 3 && (
+                <span className="text-[9px] text-[#4a5578]">
+                  +{paper.topics.length - 3} more
+                </span>
+              )}
+            </div>
+          )}
 
-        {/* Status indicators */}
-        {(isScheduled || isInReadingList || paper.status) && (
-          <div className="px-4 py-2 border-t border-[#2a2a2a] flex items-center gap-1.5">
-            {isScheduled && (
-              <Badge variant="secondary" className="h-4 px-1.5 text-[10px] bg-violet-500/10 text-violet-400">
-                <Calendar className="h-3 w-3 mr-1" />
-                Scheduled
-              </Badge>
-            )}
-            {isInReadingList && (
-              <Badge variant="secondary" className="h-4 px-1.5 text-[10px] text-blue-400">
-                <BookMarked className="h-3 w-3 mr-1" />
-                In List
-              </Badge>
-            )}
-            {paper.status && (
-              <Badge 
-                variant="secondary" 
-                className={cn(
-                  "h-4 px-1.5 text-[10px]",
-                  paper.status === 'completed' && "bg-green-500/10 text-green-400",
-                  paper.status === 'in_progress' && "bg-yellow-500/10 text-yellow-400",
-                  paper.status === 'unread' && "bg-gray-500/10 text-gray-400"
-                )}
-              >
-                {paper.status === 'completed' ? 'Read' : 
-                 paper.status === 'in_progress' ? 'Reading' : 'Unread'}
-              </Badge>
-            )}
-          </div>
-        )}
-
-        {/* Action buttons */}
-        <div 
-          className="px-4 py-2 border-t border-[#2a2a2a] flex items-center gap-1.5"
-          onClick={(e) => {
-            e.stopPropagation();
-            e.preventDefault();
-          }}
-        >
-          {shouldShowScheduleButton && onSchedule && (
-            <Popover open={open} onOpenChange={setOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className={cn(
-                    "h-6 px-2 text-[10px]",
-                    isScheduled ? "bg-violet-500/10 text-violet-400 hover:bg-violet-500/20" : "bg-[#2a2a2a] hover:bg-[#333] text-white"
-                  )}
+          {/* Action buttons */}
+          <div className="flex items-center gap-2 mt-auto">
+            {shouldShowScheduleButton && onSchedule && (
+              <Popover open={open} onOpenChange={setOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-[10px] font-medium rounded-md text-[#4a5578] hover:text-white hover:bg-[#1E3A8A]/20"
+                  >
+                    <Calendar className="h-3.5 w-3.5 mr-1.5" />
+                    Schedule
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent 
+                  className="w-auto p-0 bg-[#0A192F] border-[#1E3A8A] rounded-lg shadow-lg" 
+                  align="end"
                   onClick={(e) => {
-                    if (isLoading) return;
                     e.stopPropagation();
                     e.preventDefault();
-                    setOpen(true);
                   }}
-                  disabled={isLoading}
                 >
-                  <Calendar className="h-3 w-3 mr-1" />
-                  {isScheduled ? 'Update' : 'Schedule'}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent 
-                className="w-auto p-0" 
-                align="end"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                }}
-              >
-                <div className="p-3">
-                  <div className="space-y-2">
-                    <div>
+                  <div className="p-3">
+                    <div className="space-y-3">
                       <CalendarComponent
                         mode="single"
                         selected={date}
                         onSelect={setDate}
-                        className="rounded-md border"
+                        className="rounded-lg border-[#1E3A8A]"
                       />
-                    </div>
-                    <div className="flex gap-2">
-                      <div className="flex-1">
+                      <div className="flex gap-1.5">
                         <Input
                           type="number"
+                          min="1"
                           placeholder="Est. time (min)"
-                          className="h-8 text-xs"
+                          className="h-7 text-[10px] bg-[#0A192F] border-[#1E3A8A] text-[#4a5578] placeholder:text-[#4a5578]"
                           value={estimatedTime}
-                          onChange={(e) => setEstimatedTime(e.target.value)}
+                          onChange={(e) => handleEstimatedTimeChange(e.target.value)}
                         />
+                        <Select 
+                          value={repeat} 
+                          onValueChange={(value: "daily" | "weekly" | "monthly" | "none") => setRepeat(value)}
+                        >
+                          <SelectTrigger className="h-7 text-[10px] bg-[#0A192F] border-[#1E3A8A] text-[#4a5578]">
+                            <SelectValue placeholder="Repeat" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-[#0A192F] border-[#1E3A8A]">
+                            <SelectItem value="none" className="text-[10px]">No repeat</SelectItem>
+                            <SelectItem value="daily" className="text-[10px]">Daily</SelectItem>
+                            <SelectItem value="weekly" className="text-[10px]">Weekly</SelectItem>
+                            <SelectItem value="monthly" className="text-[10px]">Monthly</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
-                      <Select value={repeat} onValueChange={(value: any) => setRepeat(value)}>
-                        <SelectTrigger className="h-8 text-xs">
-                          <SelectValue placeholder="Repeat" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">No repeat</SelectItem>
-                          <SelectItem value="daily">Daily</SelectItem>
-                          <SelectItem value="weekly">Weekly</SelectItem>
-                          <SelectItem value="monthly">Monthly</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <Button 
+                        className="w-full h-7 text-[10px] bg-[#1E3A8A] text-white hover:bg-[#1E3A8A]/80 rounded-md font-medium"
+                        onClick={handleSchedule}
+                        disabled={!date}
+                      >
+                        Schedule Paper
+                      </Button>
                     </div>
-                    <Button 
-                      className="w-full h-8 text-xs"
-                      onClick={handleSchedule}
-                      disabled={!date}
-                    >
-                      {isScheduled ? 'Update Schedule' : 'Schedule Paper'}
-                    </Button>
                   </div>
-                </div>
-              </PopoverContent>
-            </Popover>
-          )}
+                </PopoverContent>
+              </Popover>
+            )}
 
-          {shouldShowCategoryButton && onChangeCategory && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 px-2 text-[10px] hover:bg-[#333] bg-[#2a2a2a] text-white"
-              onClick={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                onChangeCategory();
-              }}
-              disabled={isLoading}
-            >
-              <BookMarked className="h-3 w-3 mr-1" />
-              Category
-            </Button>
-          )}
+            {shouldShowAddToListButton && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-[10px] font-medium hover:bg-[#1E3A8A]/20 text-[#4a5578] hover:text-white rounded-md ml-auto"
+                onClick={handleAddToList}
+                disabled={isLoading || isInReadingList}
+              >
+                {isInReadingList ? (
+                  <>
+                    <BookMarked className="h-3.5 w-3.5 mr-1.5" />
+                    In Library
+                  </>
+                ) : context === 'search' ? (
+                  <>
+                    <Plus className="h-3.5 w-3.5 mr-1.5" />
+                    Add to Library
+                  </>
+                ) : (
+                  <>
+                    <BookOpen className="h-3.5 w-3.5 mr-1.5" />
+                    Add to List
+                  </>
+                )}
+              </Button>
+            )}
 
-          {shouldShowAddToListButton && onAddToList && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 px-2 text-[10px] hover:bg-[#333] bg-[#2a2a2a] text-white"
-              onClick={handleAddToList}
-              disabled={isLoading}
-            >
-              <BookMarked className="h-3 w-3 mr-1" />
-              Add
-            </Button>
-          )}
-
-          {context === "main" && onDelete && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete();
-              }}
-              className="h-6 px-2 text-[10px] text-red-400 hover:text-red-400 hover:bg-red-500/10"
-            >
-              <Trash2 className="h-3 w-3 mr-1" />
-              Delete
-            </Button>
-          )}
-
-          {onAddToLibrary && (
-            <Button
-              variant="secondary"
-              size="sm"
-              className={`h-6 px-2 text-[10px] font-medium transition-colors ml-auto
-                ${isAdding 
-                  ? 'bg-[#2a2a2a] text-[#888]' 
-                  : paper.in_reading_list 
-                  ? 'bg-violet-500/10 text-violet-400 hover:bg-violet-500/20'
-                  : 'bg-[#2a2a2a] text-white hover:bg-[#333]'
-                }`}
-              onClick={(e) => {
-                e.stopPropagation();
-                onAddToLibrary(paper);
-              }}
-              disabled={isAdding || paper.in_reading_list}
-            >
-              {isAdding ? (
-                <>
-                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                  Adding...
-                </>
-              ) : paper.in_reading_list ? (
-                <>
-                  <FileText className="h-3 w-3 mr-1" />
-                  In Library
-                </>
-              ) : (
-                <>
-                  <BookOpen className="h-3 w-3 mr-1" />
-                  Add
-                </>
-              )}
-            </Button>
-          )}
+            {annotations && annotations.length > 0 && (
+              <div className="flex items-center gap-1 text-[#4a5578] ml-auto">
+                <MessageSquare className="h-3.5 w-3.5" />
+                <span className="text-[10px]">{annotations.length}</span>
+              </div>
+            )}
+          </div>
         </div>
       </Card>
     </motion.div>

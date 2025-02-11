@@ -17,6 +17,19 @@ export interface Paper {
     query?: string;
     discovery_type?: string;
   };
+  // Reading list related fields
+  in_reading_list?: boolean;
+  scheduled_date?: string;
+  estimated_time?: number;
+  repeat?: "daily" | "weekly" | "monthly" | "none";
+  status?: "unread" | "in_progress" | "completed";
+  // Category related fields
+  category_id?: string;
+  category?: {
+    id: string;
+    name: string;
+    color: string;
+  };
 }
 
 export interface Annotation {

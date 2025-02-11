@@ -65,7 +65,7 @@ export function AuthForm() {
     <div className="flex flex-col gap-4 min-w-[300px]">
       <Button
         variant="outline"
-        className="bg-[#1c1c1c] border-[#2a2a2a] hover:bg-[#2a2a2a] text-white relative h-11"
+        className="bg-[#030014] border-[#2a2a2a] hover:bg-[#2a2a2a] text-white relative h-11"
         onClick={signInWithGithub}
         disabled={isLoading}
       >
@@ -90,7 +90,7 @@ export function AuthForm() {
           placeholder="name@example.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="bg-[#1c1c1c] border-[#2a2a2a] text-white placeholder:text-[#666] h-11"
+          className="bg-[#030014] border-[#2a2a2a] text-white placeholder:text-[#666] h-11"
           disabled={isLoading}
         />
         <Input
@@ -98,7 +98,7 @@ export function AuthForm() {
           placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="bg-[#1c1c1c] border-[#2a2a2a] text-white placeholder:text-[#666] h-11"
+          className="bg-[#030014] border-[#2a2a2a] text-white placeholder:text-[#666] h-11"
           disabled={isLoading}
         />
         <Button

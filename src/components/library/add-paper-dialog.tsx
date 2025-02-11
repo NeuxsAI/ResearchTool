@@ -201,7 +201,7 @@ export function AddPaperDialog({ open, onOpenChange, categoryId, onPaperAdded }:
       if (!open) resetForm();
       onOpenChange(open);
     }}>
-      <DialogContent className="sm:max-w-[600px] bg-[#1c1c1c] border-[#2a2a2a]">
+      <DialogContent className="sm:max-w-[600px] bg-[#030014] border-[#2a2a2a]">
         {isLoading && <LoadingOverlay message="Processing your paper..." />}
         <form onSubmit={handleSubmit}>
           <DialogHeader>
@@ -329,7 +329,7 @@ export function AddPaperDialog({ open, onOpenChange, categoryId, onPaperAdded }:
                       type="button"
                       onClick={handleUrlSubmit}
                       disabled={!url || isLoading}
-                      className="h-[calc(100%-2px)] px-3 text-[11px] bg-[#2a2a2a] hover:bg-[#333] text-white absolute right-[1px] top-[1px] rounded-l-none"
+                      className="h-[calc(100%-2px)] px-3 text-[11px] bg-[#1a1f2e] hover:bg-[#2a3142] text-white absolute right-[1px] top-[1px] rounded-l-none"
                     >
                       {isLoading ? "Processing..." : "Process"}
                     </Button>
@@ -404,7 +404,7 @@ export function AddPaperDialog({ open, onOpenChange, categoryId, onPaperAdded }:
             <Button 
               type="submit"
               disabled={isLoading || (activeTab === "upload" && !file) || (activeTab === "url" && !url)}
-              className="h-7 px-3 mt-5 text-[11px] bg-[#2a2a2a] hover:bg-[#333] text-white"
+              className="h-7 px-3 mt-5 text-[11px] bg-[#1a1f2e] hover:bg-[#2a3142] text-white"
             >
               Add paper
             </Button>

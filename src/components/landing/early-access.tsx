@@ -107,7 +107,7 @@ export function EarlyAccess() {
                 <Button 
                   type="submit" 
                   disabled={isLoading}
-                  className="h-12 bg-[#2a2a2a] hover:bg-[#333] text-white whitespace-nowrap px-8"
+                  className="h-12 bg-[#1a1f2e] hover:bg-[#2a3142] text-white whitespace-nowrap px-8"
                 >
                   {isLoading ? "Joining..." : "Join Waitlist"}
                   <ArrowRight className="ml-2 h-4 w-4" />

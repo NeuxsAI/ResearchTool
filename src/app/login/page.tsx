@@ -20,7 +20,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen flex-col items-center justify-center bg-[#030014] px-4">
       <div className="w-full max-w-[400px] space-y-8">
         <div className="flex flex-col items-center space-y-2 text-center">
-          <div className="rounded-full bg-[#1c1c1c] p-2">
+          <div className="rounded-full bg-[#030014] p-2">
             <BookCopy className="h-8 w-8 text-white" />
           </div>
           <h1 className="text-2xl font-semibold tracking-tight text-white">

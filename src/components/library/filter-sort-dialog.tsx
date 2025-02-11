@@ -58,7 +58,7 @@ export function FilterSortDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[400px] bg-[#1c1c1c] border-[#2a2a2a] p-6">
+      <DialogContent className="sm:max-w-[400px] bg-[#030014] border-[#2a2a2a] p-6">
         <DialogHeader className="px-0 pb-2">
           <DialogTitle className="text-white flex items-center gap-2 text-base">
             <SlidersHorizontal className="h-4 w-4" />
@@ -138,7 +138,7 @@ export function FilterSortDialog({
           </Button>
           <Button
             onClick={handleApply}
-            className="h-7 px-3 text-[11px] bg-[#2a2a2a] hover:bg-[#333] text-white"
+            className="h-7 px-3 text-[11px] bg-[#1a1f2e] hover:bg-[#2a3142] text-white"
           >
             Apply
           </Button>

@@ -12,6 +12,8 @@ import { AddPaperDialog } from "@/components/library/add-paper-dialog";
 import { getPapers, getCategories } from "@/lib/supabase/db";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
+import { toast } from "sonner";
+import { cache, CACHE_KEYS } from "@/lib/cache";
 
 interface Paper {
   id: string;
@@ -52,6 +54,34 @@ const itemVariants = {
   }
 };
 
+// Preload function for parallel data fetching
+async function preloadData(refresh = false) {
+  const cachedCategories = !refresh && cache.get<Category[]>(CACHE_KEYS.CATEGORIES);
+  const cachedPapers = !refresh && cache.get<Paper[]>(CACHE_KEYS.PAPERS);
+
+  if (cachedCategories && cachedPapers) {
+    return {
+      categories: cachedCategories,
+      papers: cachedPapers
+    };
+  }
+
+  const [categoriesResult, papersResult] = await Promise.all([
+    getCategories(),
+    getPapers()
+  ]);
+
+  const categories = categoriesResult.data || [];
+  const papers = papersResult.data || [];
+
+  if (!refresh) {
+    cache.set(CACHE_KEYS.CATEGORIES, categories);
+    cache.set(CACHE_KEYS.PAPERS, papers);
+  }
+
+  return { categories, papers };
+}
+
 export default function CategoriesPage() {
   const router = useRouter();
   const [isAddPaperOpen, setIsAddPaperOpen] = useState(false);
@@ -60,24 +90,32 @@ export default function CategoriesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
 
-  useEffect(() => {
-    async function loadData() {
-      try {
-        setIsLoading(true);
-        const [papersResult, categoriesResult] = await Promise.all([
-          getPapers(),
-          getCategories()
-        ]);
-
-        setPapers(papersResult.data || []);
-        setCategories(categoriesResult.data || []);
-      } catch (error) {
-        console.error("Error loading data:", error);
-      } finally {
-        setIsLoading(false);
-      }
+  const loadData = async (refresh = false) => {
+    try {
+      setIsLoading(true);
+      const { categories, papers } = await preloadData(refresh);
+      setCategories(categories);
+      setPapers(papers);
+    } catch (error) {
+      console.error('Error loading data:', error);
+      toast.error('Failed to load data');
+    } finally {
+      setIsLoading(false);
     }
-    loadData();
+  };
+
+  useEffect(() => {
+    // Try to load from cache first
+    const cachedCategories = cache.get<Category[]>(CACHE_KEYS.CATEGORIES);
+    const cachedPapers = cache.get<Paper[]>(CACHE_KEYS.PAPERS);
+    
+    if (cachedCategories && cachedPapers) {
+      setCategories(cachedCategories);
+      setPapers(cachedPapers);
+      setIsLoading(false);
+    } else {
+      loadData(false);
+    }
   }, []);
 
   // Filter papers by search query
@@ -117,7 +155,7 @@ export default function CategoriesPage() {
     >
       {/* Header */}
       <motion.div 
-        className="flex-shrink-0 border-b border-[#2a2a2a] bg-[#1c1c1c] p-4"
+        className="flex-shrink-0 border-b border-[#2a2a2a] bg-[#030014] p-4"
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.3 }}
@@ -131,7 +169,7 @@ export default function CategoriesPage() {
           </div>
           <Button 
             onClick={() => setIsAddPaperOpen(true)}
-            className="h-8 px-3 text-[11px] bg-[#2a2a2a] hover:bg-[#333] text-white"
+            className="h-8 px-3 text-[11px] bg-[#1a1f2e] hover:bg-[#2a3142] text-white"
           >
             <Plus className="h-3.5 w-3.5 mr-2" />
             Add paper

@@ -60,7 +60,7 @@ export function Hero() {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.5, delay: 0.2 }}
-            className="inline-flex items-center rounded-full border border-[#333] bg-[#1c1c1c] px-4 py-1.5 mb-8"
+            className="inline-flex items-center rounded-full border border-[#333] bg-[#030014] px-4 py-1.5 mb-8"
           >
             <span className="text-xs font-medium text-[#888]">
               Now in beta
@@ -110,7 +110,7 @@ export function Hero() {
             <Button 
               onClick={handleGetStarted}
               size="lg" 
-              className="h-12 px-8 bg-[#2a2a2a] hover:bg-[#333] text-white"
+              className="h-12 px-8 bg-[#1a1f2e] hover:bg-[#2a3142] text-white"
             >
               Get Started
               <ArrowRight className="ml-2 h-4 w-4" />

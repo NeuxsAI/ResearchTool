@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Trash2, MessageSquare, Pencil, LayoutGrid, List, Settings2 } from "lucide-react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { AddPaperDialog } from "@/components/library/add-paper-dialog";
-import { getCategoryById, getPapersByCategory, updatePaper, updateCategory, deletePaper } from "@/lib/supabase/db";
+import { getCategoryById, getPapersByCategory, getAnnotationsByPaper, getReadingList, updatePaper, updateCategory, deletePaper } from "@/lib/supabase/db";
 import { toast } from "sonner";
 import { useParams, useRouter } from "next/navigation";
 import { EditPaperDialog } from "@/components/library/edit-paper-dialog";
@@ -16,6 +16,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PaperCard } from "@/components/paper-card";
 import { DeletePaperDialog } from "@/components/library/delete-paper-dialog";
+import { cache, CACHE_KEYS } from "@/lib/cache";
+import type { Paper, Category, ReadingListItem, Annotation } from "@/lib/types";
 
 interface Category {
   id: string;
@@ -48,11 +50,52 @@ interface Paper {
   in_reading_list?: boolean;
 }
 
+// Preload function for parallel data fetching
+async function preloadData(categoryId: string, refresh = false) {
+  const cachedPapers = !refresh && cache.get(`category_papers_${categoryId}`);
+  const cachedAnnotations = !refresh && cache.get(`category_annotations_${categoryId}`);
+  const cachedReadingList = !refresh && cache.get(CACHE_KEYS.READING_LIST);
+
+  if (cachedPapers && cachedAnnotations && cachedReadingList) {
+    return {
+      papers: cachedPapers,
+      annotations: cachedAnnotations,
+      readingList: cachedReadingList
+    };
+  }
+
+  // First get papers for this category
+  const papersResult = await getPapersByCategory(categoryId);
+  const papers = papersResult.data || [];
+
+  // Then load everything else in parallel
+  const [annotationsResults, readingListResult] = await Promise.all([
+    Promise.all(papers.map(paper => getAnnotationsByPaper(paper.id))),
+    getReadingList()
+  ]);
+
+  const annotations = annotationsResults
+    .filter(result => !result.error)
+    .flatMap(result => result.data || [])
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  const readingList = readingListResult.data || [];
+
+  if (!refresh) {
+    cache.set(`category_papers_${categoryId}`, papers);
+    cache.set(`category_annotations_${categoryId}`, annotations);
+    cache.set(CACHE_KEYS.READING_LIST, readingList);
+  }
+
+  return { papers, annotations, readingList };
+}
+
 export default function CategoryPage() {
   const params = useParams();
   const router = useRouter();
   const [category, setCategory] = useState<Category | null>(null);
   const [papers, setPapers] = useState<Paper[]>([]);
+  const [annotations, setAnnotations] = useState<Record<string, Annotation[]>>({});
+  const [readingList, setReadingList] = useState<ReadingListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isAddPaperOpen, setIsAddPaperOpen] = useState(false);
@@ -63,8 +106,39 @@ export default function CategoryPage() {
   const [paperToDelete, setPaperToDelete] = useState<Paper | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  const loadData = async (refresh = false) => {
+    try {
+      setIsLoading(true);
+      const { papers, annotations, readingList } = await preloadData(params.slug, refresh);
+      setPapers(papers);
+      setAnnotations(annotations);
+      setReadingList(readingList);
+    } catch (error) {
+      console.error('Error loading data:', error);
+      toast.error('Failed to load data');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    async function loadData() {
+    // Try to load from cache first
+    const cachedPapers = cache.get(`category_papers_${params.slug}`);
+    const cachedAnnotations = cache.get(`category_annotations_${params.slug}`);
+    const cachedReadingList = cache.get(CACHE_KEYS.READING_LIST);
+    
+    if (cachedPapers && cachedAnnotations && cachedReadingList) {
+      setPapers(cachedPapers);
+      setAnnotations(cachedAnnotations);
+      setReadingList(cachedReadingList);
+      setIsLoading(false);
+    } else {
+      loadData(false);
+    }
+  }, [params.slug]);
+
+  useEffect(() => {
+    async function loadCategory() {
       if (!params?.slug) return;
       
       try {
@@ -105,7 +179,7 @@ export default function CategoryPage() {
         setIsLoading(false);
       }
     }
-    loadData();
+    loadCategory();
   }, [params?.slug]);
 
   const handlePaperClick = (paper: Paper) => {
@@ -182,7 +256,7 @@ export default function CategoryPage() {
 
   if (isLoading) {
     return <MainLayout>
-      <div className="h-full bg-[#1c1c1c]">
+      <div className="h-full bg-[#030014]">
         {/* Header Skeleton */}
         <div className="p-6 border-b border-[#2a2a2a]">
           <div className="w-full">
@@ -235,7 +309,7 @@ export default function CategoryPage() {
   const isEmpty = papers.length === 0;
 
   const content = (
-    <div className="h-full bg-[#1c1c1c]">
+    <div className="h-full bg-[#030014]">
       <div className="p-6 border-b border-[#2a2a2a]">
         <div className="w-full">
           <div className="flex items-center justify-between mb-4">
@@ -256,7 +330,7 @@ export default function CategoryPage() {
             {!isEmpty && (
               <Button 
                 onClick={() => setIsAddPaperOpen(true)}
-                className="h-7 px-3 text-[11px] bg-[#2a2a2a] hover:bg-[#333] text-white"
+                className="h-7 px-3 text-[11px] bg-[#1a1f2e] hover:bg-[#2a3142] text-white"
               >
                 <Plus className="h-3 w-3 mr-2" />
                 Add paper
@@ -282,7 +356,7 @@ export default function CategoryPage() {
             <div className="flex flex-col w-full gap-2">
               <Button 
                 onClick={() => setIsAddPaperOpen(true)}
-                className="h-7 px-3 text-[11px] bg-[#2a2a2a] hover:bg-[#333] text-white"
+                className="h-7 px-3 text-[11px] bg-[#1a1f2e] hover:bg-[#2a3142] text-white"
               >
                 <Plus className="h-3 w-3 mr-2" />
                 Add paper
@@ -379,7 +453,7 @@ export default function CategoryPage() {
   return <MainLayout>
     {content}
     <Dialog open={isEditCategoryOpen} onOpenChange={setIsEditCategoryOpen}>
-      <DialogContent className="sm:max-w-[425px] bg-[#1c1c1c] border-[#2a2a2a]">
+      <DialogContent className="sm:max-w-[425px] bg-[#030014] border-[#2a2a2a]">
         <DialogHeader>
           <DialogTitle className="text-lg font-semibold text-white">Edit Category</DialogTitle>
         </DialogHeader>
@@ -415,7 +489,7 @@ export default function CategoryPage() {
           <div className="flex justify-end">
             <Button 
               type="submit" 
-              className="h-8 px-4 text-[11px] bg-[#2a2a2a] hover:bg-[#333] text-white"
+              className="h-8 px-4 text-[11px] bg-[#1a1f2e] hover:bg-[#2a3142] text-white"
             >
               Save Changes
             </Button>
