@@ -214,7 +214,6 @@ export default function DiscoverPage() {
         year: paper.year,
         abstract: paper.abstract,
         url: paper.url,
-        citations: paper.citations,
         impact: paper.impact,
         topics: paper.topics
       });
@@ -419,10 +418,10 @@ export default function DiscoverPage() {
                     )}
                   </div>
 
-                  <div className="h-[calc(100vh-16rem)] overflow-hidden">
+                  <div className="h-[70vh] overflow-hidden">
                     {!hasSearched && !isLoading && (
                       <div className="h-full flex items-center justify-center">
-                        <div className="flex flex-col items-center space-y-3">
+                        <div className="flex flex-col items-center space-y-3 -mt-52">
                           <div className="p-3 rounded-full bg-[#1a1f2e]">
                             <Search className="h-5 w-5 text-[#4a5578]" />
                           </div>
@@ -432,7 +431,7 @@ export default function DiscoverPage() {
                               Enter a topic, author name, or research interest to discover relevant papers
                             </p>
                           </div>
-                          <div className="flex flex-wrap gap-2 justify-center max-w-lg mt-2">
+                          <div className="flex flex-wrap gap-2 justify-center max-w-md pt-5 mt-5">
                             {exampleQueries.map(({ text, icon: Icon }) => (
                               <Button
                                 key={text}

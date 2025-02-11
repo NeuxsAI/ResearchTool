@@ -28,6 +28,7 @@ export async function POST(request: Request) {
     const citations = formData.get('citations') as string;
     const impact = formData.get('impact') as string;
     const topicsStr = formData.get('topics') as string;
+    const categoryId = formData.get('categoryId') as string;
 
     // Parse and validate the data
     if (!title?.trim()) {
@@ -59,7 +60,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Insert into papers table with only the fields that exist
+    // Insert into papers table with all necessary fields
     const { data: paper, error: insertError } = await supabase
       .from('papers')
       .insert({
@@ -68,10 +69,14 @@ export async function POST(request: Request) {
         year: parseInt(yearStr),
         abstract: abstract || '',
         url: url || '',
+        citations: parseInt(citations || '0'),
+        impact: impact || 'low',
+        topics: topics,
+        category_id: categoryId || null,
         created_at: new Date().toISOString(),
         user_id: user.id
       })
-      .select()
+      .select('*, categories(*)')
       .single();
 
     if (insertError) {
@@ -82,7 +87,18 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json({ paper });
+    // Transform the response to match the expected Paper type
+    const transformedPaper = {
+      ...paper,
+      category: paper.categories,
+      in_reading_list: true,
+      citations: paper.citations || 0,
+      impact: paper.impact || 'low',
+      topics: paper.topics || [],
+    };
+    delete transformedPaper.categories;
+
+    return NextResponse.json({ data: transformedPaper });
 
   } catch (error) {
     console.error('Server error:', error);
