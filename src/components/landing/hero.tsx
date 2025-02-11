@@ -4,8 +4,10 @@ import { Button } from "@/components/ui/button"
 import { ArrowRight, Sparkles, BookOpen, Brain } from "lucide-react"
 import { motion } from "framer-motion"
 import { useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
-import { useEffect, useState } from "react"
+import { useSearchParams } from "next/navigation"
+import { useState, useEffect } from "react"
+import supabase from "@/lib/supabase/client"
+import { Github } from "lucide-react"
 
 const features = [
   {
@@ -28,7 +30,6 @@ const features = [
 export function Hero() {
   const [session, setSession] = useState<any>(null)
   const router = useRouter()
-  const supabase = createClient()
 
   useEffect(() => {
     const getSession = async () => {
@@ -36,7 +37,14 @@ export function Hero() {
       setSession(session)
     }
     getSession()
-  }, [supabase])
+
+    // Set up auth state change listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session)
+    })
+
+    return () => subscription.unsubscribe()
+  }, []) // Remove supabase from dependencies
 
   const handleGetStarted = () => {
     router.push(session ? '/main' : '/login')

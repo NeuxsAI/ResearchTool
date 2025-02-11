@@ -65,11 +65,10 @@ export async function GET(request: Request) {
       citations: paper.citations || 0,
       impact: paper.impact || 'low',
       topics: paper.topics || [],
-      arxiv_id: paper.id,
-      user_id: user.id,
       source: 'recommendations',
-      discovered_at: new Date().toISOString(),
+      created_at: new Date().toISOString(),
       metadata: {
+        arxiv_id: paper.id,
         institution: paper.institution,
         discovery_type: 'recommended'
       }
@@ -78,7 +77,7 @@ export async function GET(request: Request) {
     const { error: storeError } = await supabase
       .from('discovered_papers')
       .upsert(discoveredPapers, {
-        onConflict: 'arxiv_id,user_id',
+        onConflict: 'id',
         ignoreDuplicates: false
       });
 

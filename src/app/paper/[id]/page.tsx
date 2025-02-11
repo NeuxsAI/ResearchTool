@@ -142,8 +142,15 @@ export default function PaperPage() {
       if (result.error) throw result.error;
       if (!result.data) throw new Error("No data returned");
 
+      // Update local state immediately
       setAnnotations(prev => [...prev, result.data!]);
+      
+      // Clear highlight
       setHighlightedText(undefined);
+      
+      // Clear specific cache keys but don't reload
+      cache.delete(`annotations_${paper.id}`);
+      
       toast.success("Annotation saved");
     } catch (error) {
       console.error("Error saving annotation:", error);
@@ -315,26 +322,27 @@ export default function PaperPage() {
 
   const handleSaveChat = async (messages: ChatMessage[]) => {
     try {
-      // Get the first message as title/summary
       const firstMessage = messages[0];
-      if (!firstMessage) return;
+      if (!firstMessage || !paper) return;
 
-      // Create a new annotation with the chat
       const { data: annotation, error } = await createAnnotation({
-        paper_id: paper?.id as string,
-        content: firstMessage.content.slice(0, 100) + "...", // First message as summary
+        paper_id: paper.id,
+        content: firstMessage.content.slice(0, 100) + "...",
         highlight_text: firstMessage.highlightText,
         chat_history: messages
       });
 
       if (error) throw error;
+      if (!annotation) throw new Error("No annotation returned");
 
-      // Refresh annotations
-      const { data: updatedAnnotations } = await getAnnotationsByPaper(paper?.id as string);
-      setAnnotations(updatedAnnotations || []);
-
-      // Reset chat messages after successful save
+      // Update local state immediately
+      setAnnotations(prev => [...prev, annotation]);
+      
+      // Clear chat state
       setChatMessages([]);
+      
+      // Clear specific cache
+      cache.delete(`annotations_${paper.id}`);
       
       toast.success("Chat saved as annotation");
     } catch (error) {
@@ -360,8 +368,20 @@ export default function PaperPage() {
   };
 
   const handleAnnotationDelete = async (annotationId: string) => {
-    const newAnnotations = annotations.filter(a => a.id !== annotationId);
-    setAnnotations(newAnnotations);
+    try {
+      // Update UI immediately
+      setAnnotations(prev => prev.filter(a => a.id !== annotationId));
+      
+      // Clear specific cache
+      cache.delete(`annotations_${paper.id}`);
+      
+      toast.success("Annotation deleted");
+    } catch (error) {
+      console.error("Error deleting annotation:", error);
+      toast.error("Failed to delete annotation");
+      // Revert on error
+      loadData(true);
+    }
   };
 
   if (isLoading) {
@@ -385,13 +405,15 @@ export default function PaperPage() {
 
   const handleUpdatePaper = async (paperDetails: { title: string; authors: string[]; year: number }) => {
     try {
-      console.log('Updating paper with details:', paperDetails);
       const { error } = await updatePaper(paper.id, paperDetails);
-      if (error) {
-        console.error('Full update error:', error);
-        throw error;
-      }
+      if (error) throw error;
+
+      // Update local state immediately
       setPaper(prev => prev ? { ...prev, ...paperDetails } : null);
+      
+      // Clear specific cache
+      cache.delete(`paper_${paper.id}`);
+      
       toast.success('Paper updated successfully');
     } catch (error) {
       console.error('Error updating paper:', error);

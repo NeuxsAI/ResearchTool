@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileText, Plus, Grid2x2, Search, MessageSquare, LayoutGrid, List } from "lucide-react";
+import { FileText, Plus, Grid2x2, Search, MessageSquare, LayoutGrid, List, Activity, Sparkles } from "lucide-react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { AddPaperDialog } from "@/components/library/add-paper-dialog";
 import { getPapers, getCategories, getAnnotationsByPaper, getReadingList, deletePaper, addToReadingList } from "@/lib/supabase/db";
@@ -18,7 +18,7 @@ import { toast } from "sonner";
 import { cache, CACHE_KEYS } from "@/lib/cache";
 import type { Paper as DbPaper, Annotation, ReadingListItem } from "@/lib/supabase/types";
 import type { Paper } from "@/lib/types";
-import { PaperCard } from "@/components/paper-card";
+import { PaperCard, PaperCardSkeleton } from "@/components/paper-card";
 import { DeletePaperDialog } from "@/components/library/delete-paper-dialog";
 
 // Animation variants
@@ -148,7 +148,7 @@ export default function RecentPage() {
     router.push(`/paper/${paper.id}`);
   };
 
-  const handleDeletePaper = async (paper: DbPaper) => {
+  const handleDeletePaper = (paper: DbPaper) => {
     setPaperToDelete(paper);
   };
 
@@ -163,15 +163,23 @@ export default function RecentPage() {
         throw result.error;
       }
 
-      // Update local state
+      // Update UI state first
       setPapers(prevPapers => prevPapers.filter(p => p.id !== paperToDelete.id));
+      
+      // Clean up dialog state
+      setPaperToDelete(null);
+      setIsDeleting(false);
+      
+      // Clear cache
+      cache.delete(RECENT_CACHE_KEYS.RECENT_PAPERS);
+      
       toast.success("Paper deleted successfully");
     } catch (error) {
       console.error("Error deleting paper:", error);
-      toast.error("Failed to delete paper");
-    } finally {
-      setIsDeleting(false);
+      // Clean up dialog state even on error
       setPaperToDelete(null);
+      setIsDeleting(false);
+      toast.error("Failed to delete paper");
     }
   };
 
@@ -199,37 +207,108 @@ export default function RecentPage() {
     </div>
   );
 
+  if (isLoading) {
+    return (
+      <MainLayout>
+        <div className="flex flex-col flex-1">
+          <div className="p-6 border-b border-[#1a1f2e]">
+            <h1 className="text-sm font-medium text-white">Recent Activity</h1>
+            <p className="text-xs text-[#4a5578]">View your recent papers and annotations</p>
+          </div>
+          <div className="p-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[...Array(6)].map((_, i) => (
+                <PaperCardSkeleton key={i} />
+              ))}
+            </div>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
+
+  if (!isLoading && papers.length === 0) {
+    return (
+      <MainLayout>
+        <div className="flex flex-col flex-1">
+          <div className="p-6 border-b border-[#1a1f2e]">
+            <h1 className="text-sm font-medium text-white">Recent Activity</h1>
+            <p className="text-xs text-[#4a5578]">View your recent papers and annotations</p>
+          </div>
+
+          <div className="flex-1 flex items-center justify-center p-6">
+            <div className="flex flex-col items-center max-w-md text-center">
+              <div className="w-12 h-12 rounded-full bg-[#1a1f2e] flex items-center justify-center mb-6">
+                <Activity className="w-6 h-6 text-emerald-500" />
+              </div>
+              <h2 className="text-xl font-medium text-white mb-2">No Recent Activity</h2>
+              <p className="text-sm text-[#4a5578] mb-8">
+                Your recent activity will appear here once you start interacting with papers in your library.
+              </p>
+              <div className="flex flex-col w-full gap-3">
+                <Button
+                  onClick={() => router.push('/main')}
+                  className="h-9 px-4 text-sm bg-[#1a1f2e] hover:bg-[#2a3142] text-white"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Papers to Your Library
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => router.push('/discover')}
+                  className="h-9 px-4 text-sm border-[#1a1f2e] hover:bg-[#1a1f2e] text-[#4a5578]"
+                >
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Explore Research Papers
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
+
   return (
     <MainLayout>
-      <motion.div 
-        className="h-full bg-[#030014]"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.3 }}
-      >
-        <div className="p-6 border-b border-[#1a1f2e]">
-          <motion.div 
-            className="w-full"
-            initial={{ y: -20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ duration: 0.3 }}
-          >
+      <div className="flex flex-col h-full bg-[#030014]">
+        {/* Header */}
+        <div className="border-b border-[#1a1f2e] bg-[#030014]">
+          <div className="p-6">
             <div className="flex items-center justify-between mb-4">
-              <h1 className="text-xl font-semibold text-[#eee]">Recent</h1>
-              <Button 
-                onClick={() => setIsAddPaperOpen(true)}
-                className="h-8 px-3 text-[11px] bg-[#1a1f2e] hover:bg-[#2a3142] text-white"
-              >
-                <Plus className="h-3.5 w-3.5 mr-2" />
-                Add paper
-              </Button>
+              <div>
+                <h1 className="text-sm font-medium text-white">Recent Activity</h1>
+                <p className="text-xs text-[#4a5578]">View your recent papers and annotations</p>
+              </div>
             </div>
-            <p className="max-w-3xl text-[11px] leading-relaxed text-[#4a5578]">
-              Recently viewed and modified papers.
-            </p>
-          </motion.div>
+
+            <div className="flex items-center justify-between">
+              <div className="text-[11px] text-[#4a5578]">
+                {papers.length} papers
+              </div>
+              <div className="flex items-center gap-2">
+                <Tabs defaultValue="grid">
+                  <TabsList className="h-7 bg-[#1a1f2e] p-0.5 gap-0.5">
+                    <TabsTrigger 
+                      value="grid" 
+                      className="h-6 w-6 p-0 data-[state=active]:bg-[#2a3142]"
+                    >
+                      <LayoutGrid className="h-3.5 w-3.5" />
+                    </TabsTrigger>
+                    <TabsTrigger 
+                      value="list" 
+                      className="h-6 w-6 p-0 data-[state=active]:bg-[#2a3142]"
+                    >
+                      <List className="h-3.5 w-3.5" />
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </div>
+            </div>
+          </div>
         </div>
 
+        {/* Main Content */}
         <div className="p-6">
           <div className="w-full">
             <Tabs defaultValue="grid" className="w-full">
@@ -349,7 +428,7 @@ export default function RecentPage() {
             </Tabs>
           </div>
         </div>
-      </motion.div>
+      </div>
 
       <AddPaperDialog 
         open={isAddPaperOpen} 
@@ -359,9 +438,11 @@ export default function RecentPage() {
       <DeletePaperDialog
         open={Boolean(paperToDelete)}
         onOpenChange={(open) => !open && setPaperToDelete(null)}
-        onConfirm={handleConfirmDelete}
+        paperId={paperToDelete?.id || ""}
         paperTitle={paperToDelete?.title || ""}
-        isDeleting={isDeleting}
+        onSuccess={() => {
+          setPapers(prevPapers => prevPapers.filter(p => p.id !== paperToDelete?.id));
+        }}
       />
     </MainLayout>
   );

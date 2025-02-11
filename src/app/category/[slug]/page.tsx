@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Trash2, MessageSquare, Pencil, LayoutGrid, List, Settings2 } from "lucide-react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { AddPaperDialog } from "@/components/library/add-paper-dialog";
-import { getCategoryById, getPapersByCategory, getAnnotationsByPaper, getReadingList, updatePaper, updateCategory, deletePaper } from "@/lib/supabase/db";
+import { getCategoryById, getPapersByCategory, getReadingList, updatePaper, updateCategory, deletePaper } from "@/lib/supabase/db";
 import { toast } from "sonner";
 import { useParams, useRouter } from "next/navigation";
 import { EditPaperDialog } from "@/components/library/edit-paper-dialog";
@@ -17,86 +17,68 @@ import { Label } from "@/components/ui/label";
 import { PaperCard } from "@/components/paper-card";
 import { DeletePaperDialog } from "@/components/library/delete-paper-dialog";
 import { cache, CACHE_KEYS } from "@/lib/cache";
-import type { Paper, Category, ReadingListItem, Annotation } from "@/lib/types";
-
-interface Category {
-  id: string;
-  name?: string;
-  description?: string;
-  color?: string;
-}
-
-interface Paper {
-  id: string;
-  title?: string;
-  authors?: string[];
-  year?: number;
-  category_id?: string;
-  annotations_count?: number;
-  abstract?: string;
-  citations?: number;
-  institution?: string;
-  impact?: "high" | "low";
-  url?: string;
-  topics?: string[];
-  scheduled_date?: string;
-  estimated_time?: number;
-  category?: {
-    id: string;
-    name: string;
-    color?: string;
-  };
-  repeat?: "daily" | "weekly" | "monthly" | "none";
-  in_reading_list?: boolean;
-}
+import type { Paper, Category, ReadingListItem } from "@/lib/types";
+import { motion } from "framer-motion";
+import { Skeleton } from "@/components/ui/skeleton";
 
 // Preload function for parallel data fetching
 async function preloadData(categoryId: string, refresh = false) {
   const cachedPapers = !refresh && cache.get(`category_papers_${categoryId}`);
-  const cachedAnnotations = !refresh && cache.get(`category_annotations_${categoryId}`);
   const cachedReadingList = !refresh && cache.get(CACHE_KEYS.READING_LIST);
 
-  if (cachedPapers && cachedAnnotations && cachedReadingList) {
+  if (cachedPapers && cachedReadingList) {
     return {
       papers: cachedPapers,
-      annotations: cachedAnnotations,
       readingList: cachedReadingList
     };
   }
 
-  // First get papers for this category
-  const papersResult = await getPapersByCategory(categoryId);
-  const papers = papersResult.data || [];
-
-  // Then load everything else in parallel
-  const [annotationsResults, readingListResult] = await Promise.all([
-    Promise.all(papers.map(paper => getAnnotationsByPaper(paper.id))),
+  // Load papers and reading list in parallel
+  const [papersResult, readingListResult] = await Promise.all([
+    getPapersByCategory(categoryId),
     getReadingList()
   ]);
 
-  const annotations = annotationsResults
-    .filter(result => !result.error)
-    .flatMap(result => result.data || [])
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  const papers = papersResult.data || [];
   const readingList = readingListResult.data || [];
 
   if (!refresh) {
     cache.set(`category_papers_${categoryId}`, papers);
-    cache.set(`category_annotations_${categoryId}`, annotations);
     cache.set(CACHE_KEYS.READING_LIST, readingList);
   }
 
-  return { papers, annotations, readingList };
+  return { papers, readingList };
 }
+
+// Add container variants at the top with other interfaces
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.05
+    }
+  }
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.3
+    }
+  }
+};
 
 export default function CategoryPage() {
   const params = useParams();
   const router = useRouter();
   const [category, setCategory] = useState<Category | null>(null);
   const [papers, setPapers] = useState<Paper[]>([]);
-  const [annotations, setAnnotations] = useState<Record<string, Annotation[]>>({});
   const [readingList, setReadingList] = useState<ReadingListItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isAddPaperOpen, setIsAddPaperOpen] = useState(false);
   const [selectedPaper, setSelectedPaper] = useState<Paper | null>(null);
@@ -108,11 +90,55 @@ export default function CategoryPage() {
 
   const loadData = async (refresh = false) => {
     try {
+      if (!refresh) {
+        // Check cache first
+        const cachedPapers = cache.get(`category_papers_${params.slug}`);
+        const cachedReadingList = cache.get(CACHE_KEYS.READING_LIST);
+        const cachedCategory = cache.get(`category_${params.slug}`);
+        
+        if (cachedPapers && cachedReadingList && cachedCategory) {
+          setPapers(cachedPapers as Paper[]);
+          setReadingList(cachedReadingList as ReadingListItem[]);
+          setCategory(cachedCategory as Category);
+          return;
+        }
+      }
+
       setIsLoading(true);
-      const { papers, annotations, readingList } = await preloadData(params.slug, refresh);
-      setPapers(papers);
-      setAnnotations(annotations);
-      setReadingList(readingList);
+      const categoryId = Array.isArray(params.slug) ? params.slug[0] : params.slug;
+      
+      if (!categoryId) {
+        setError("Invalid category ID");
+        return;
+      }
+
+      // Load everything in parallel
+      const [{ papers, readingList }, categoryResult] = await Promise.all([
+        preloadData(categoryId, refresh),
+        getCategoryById(categoryId)
+      ]);
+
+      if (categoryResult.error) {
+        console.error("Error loading category:", categoryResult.error);
+        setError("Failed to load category");
+        return;
+      }
+
+      if (!categoryResult.data) {
+        setError("Category not found");
+        return;
+      }
+
+      setPapers(papers as Paper[]);
+      setReadingList(readingList as ReadingListItem[]);
+      setCategory(categoryResult.data as Category);
+
+      // Cache the results
+      if (!refresh) {
+        cache.set(`category_papers_${params.slug}`, papers);
+        cache.set(CACHE_KEYS.READING_LIST, readingList);
+        cache.set(`category_${params.slug}`, categoryResult.data);
+      }
     } catch (error) {
       console.error('Error loading data:', error);
       toast.error('Failed to load data');
@@ -122,65 +148,8 @@ export default function CategoryPage() {
   };
 
   useEffect(() => {
-    // Try to load from cache first
-    const cachedPapers = cache.get(`category_papers_${params.slug}`);
-    const cachedAnnotations = cache.get(`category_annotations_${params.slug}`);
-    const cachedReadingList = cache.get(CACHE_KEYS.READING_LIST);
-    
-    if (cachedPapers && cachedAnnotations && cachedReadingList) {
-      setPapers(cachedPapers);
-      setAnnotations(cachedAnnotations);
-      setReadingList(cachedReadingList);
-      setIsLoading(false);
-    } else {
-      loadData(false);
-    }
+    loadData(false);
   }, [params.slug]);
-
-  useEffect(() => {
-    async function loadCategory() {
-      if (!params?.slug) return;
-      
-      try {
-        setIsLoading(true);
-        setError(null);
-        
-        const categoryId = Array.isArray(params.slug) ? params.slug[0] : params.slug;
-        const [categoryResult, papersResult] = await Promise.all([
-          getCategoryById(categoryId),
-          getPapersByCategory(categoryId)
-        ]);
-
-        if (categoryResult.error) {
-          console.error("Error loading category:", categoryResult.error);
-          setError("Failed to load category");
-          return;
-        }
-
-        if (!categoryResult.data) {
-          setError("Category not found");
-          return;
-        }
-
-        setCategory(categoryResult.data);
-        const papers = (papersResult.data as Paper[] || []).map(paper => ({
-          id: paper.id,
-          title: paper.title,
-          authors: paper.authors,
-          year: paper.year,
-          category_id: paper.category_id,
-          annotations_count: paper.annotations_count
-        }));
-        setPapers(papers);
-      } catch (error) {
-        console.error("Error loading category data:", error);
-        setError("Failed to load category data");
-      } finally {
-        setIsLoading(false);
-      }
-    }
-    loadCategory();
-  }, [params?.slug]);
 
   const handlePaperClick = (paper: Paper) => {
     router.push(`/paper/${paper.id}`);
@@ -227,7 +196,7 @@ export default function CategoryPage() {
     }
   };
 
-  const handleDeletePaper = async (paper: Paper) => {
+  const handleDeletePaper = (paper: Paper) => {
     setPaperToDelete(paper);
   };
 
@@ -242,56 +211,59 @@ export default function CategoryPage() {
         throw result.error;
       }
 
-      // Update local state
+      // Update UI state first
       setPapers(prevPapers => prevPapers.filter(p => p.id !== paperToDelete.id));
+      
+      // Clean up dialog state
+      setPaperToDelete(null);
+      setIsDeleting(false);
+      
+      // Clear cache
+      cache.delete(`category_papers_${params.slug}`);
+      
       toast.success("Paper deleted successfully");
     } catch (error) {
       console.error("Error deleting paper:", error);
-      toast.error("Failed to delete paper");
-    } finally {
-      setIsDeleting(false);
+      // Clean up dialog state even on error
       setPaperToDelete(null);
+      setIsDeleting(false);
+      toast.error("Failed to delete paper");
     }
   };
 
   if (isLoading) {
     return <MainLayout>
-      <div className="h-full bg-[#030014]">
-        {/* Header Skeleton */}
-        <div className="p-6 border-b border-[#2a2a2a]">
-          <div className="w-full">
-            <div className="flex items-center justify-between mb-4">
-              <div className="space-y-2">
-                <div className="h-6 w-48 bg-[#2a2a2a] rounded animate-pulse" />
-                <div className="h-4 w-96 bg-[#2a2a2a] rounded animate-pulse" />
-              </div>
-              <div className="h-7 w-24 bg-[#2a2a2a] rounded animate-pulse" />
-            </div>
+      <motion.div 
+        className="h-full bg-[#030014]"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+      >
+        <div className="p-6 border-b border-[#1a1f2e]">
+          <div className="max-w-3xl">
+            <Skeleton className="h-7 w-48 bg-[#1a1f2e]" />
+            <Skeleton className="h-4 w-96 mt-2 bg-[#1a1f2e]" />
           </div>
         </div>
-
-        {/* Content Skeleton */}
         <div className="p-6">
-          <div className="max-w-5xl">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {[...Array(6)].map((_, i) => (
-                <div key={i} className="p-3 bg-[#2a2a2a] border border-[#333] rounded-lg">
-                  <div className="space-y-2">
-                    <div className="h-4 w-24 bg-[#333] rounded animate-pulse" />
-                    <div className="h-4 w-48 bg-[#333] rounded animate-pulse" />
-                    <div className="h-4 w-36 bg-[#333] rounded animate-pulse" />
-                    <div className="h-[1px] bg-[#333] my-3" />
-                    <div className="flex items-center gap-2">
-                      <div className="h-6 w-6 bg-[#333] rounded animate-pulse" />
-                      <div className="h-6 w-6 bg-[#333] rounded animate-pulse" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {[...Array(6)].map((_, i) => (
+              <Card key={i} className="p-4 bg-[#1a1f2e] border-[#2a3142]">
+                <div className="flex items-start gap-3">
+                  <Skeleton className="h-10 w-10 rounded bg-[#2a3142]" />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Skeleton className="h-4 w-24 bg-[#2a3142]" />
+                      <Skeleton className="h-4 w-4 rounded-full bg-[#2a3142]" />
                     </div>
+                    <Skeleton className="h-4 w-full mb-2 bg-[#2a3142]" />
+                    <Skeleton className="h-4 w-2/3 bg-[#2a3142]" />
                   </div>
                 </div>
-              ))}
-            </div>
+              </Card>
+            ))}
           </div>
         </div>
-      </div>
+      </motion.div>
     </MainLayout>;
   }
 
@@ -309,12 +281,16 @@ export default function CategoryPage() {
   const isEmpty = papers.length === 0;
 
   const content = (
-    <div className="h-full bg-[#030014]">
-      <div className="p-6 border-b border-[#2a2a2a]">
-        <div className="w-full">
+    <div className="flex flex-col h-full bg-[#030014]">
+      {/* Header */}
+      <div className="border-b border-[#1a1f2e] bg-[#030014]">
+        <div className="p-6">
           <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-4">
-              <h1 className="text-xl font-semibold text-[#eee]">{category.name}</h1>
+            <div>
+              <h1 className="text-sm font-medium text-white">{category?.name}</h1>
+              <p className="text-xs text-[#4a5578]">{category?.description || "No description"}</p>
+            </div>
+            <div className="flex items-center gap-2">
               <Button
                 variant="ghost"
                 size="sm"
@@ -322,27 +298,48 @@ export default function CategoryPage() {
                   setEditedCategory(category);
                   setIsEditCategoryOpen(true);
                 }}
-                className="h-7 w-7 p-0"
+                className="h-7 px-2.5 text-[11px] hover:bg-[#2a3142] text-[#4a5578]"
               >
-                <Settings2 className="h-3.5 w-3.5 text-[#666] hover:text-[#888]" />
+                <Settings2 className="h-3.5 w-3.5 mr-1.5" />
+                Edit Category
+              </Button>
+              <Button
+                onClick={() => setIsAddPaperOpen(true)}
+                className="h-7 px-2.5 text-[11px] bg-[#1a1f2e] hover:bg-[#2a3142] text-white"
+              >
+                <Plus className="h-3.5 w-3.5 mr-1.5" />
+                Add Paper
               </Button>
             </div>
-            {!isEmpty && (
-              <Button 
-                onClick={() => setIsAddPaperOpen(true)}
-                className="h-7 px-3 text-[11px] bg-[#1a1f2e] hover:bg-[#2a3142] text-white"
-              >
-                <Plus className="h-3 w-3 mr-2" />
-                Add paper
-              </Button>
-            )}
           </div>
-          <p className="max-w-3xl text-[11px] leading-relaxed text-[#888]">
-            {category.description}
-          </p>
+
+          <div className="flex items-center justify-between">
+            <div className="text-[11px] text-[#4a5578]">
+              {papers.length} papers
+            </div>
+            <div className="flex items-center gap-2">
+              <Tabs defaultValue="grid">
+                <TabsList className="h-7 bg-[#1a1f2e] p-0.5 gap-0.5">
+                  <TabsTrigger 
+                    value="grid" 
+                    className="h-6 w-6 p-0 data-[state=active]:bg-[#2a3142]"
+                  >
+                    <LayoutGrid className="h-3.5 w-3.5" />
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="list" 
+                    className="h-6 w-6 p-0 data-[state=active]:bg-[#2a3142]"
+                  >
+                    <List className="h-3.5 w-3.5" />
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+          </div>
         </div>
       </div>
 
+      {/* Main Content */}
       {isEmpty ? (
         <div className="h-[calc(100vh-8.5rem)] flex flex-col items-center justify-center">
           <div className="flex flex-col items-center max-w-md text-center">
@@ -350,98 +347,82 @@ export default function CategoryPage() {
               <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: category.color }} />
               <span className="ml-2">{category.name}</span>
             </div>
-            <p className="text-[11px] text-[#666] mb-8">
+            <p className="text-[11px] text-[#666] mb-4">
               This category is empty. Start by importing an item.
             </p>
-            <div className="flex flex-col w-full gap-2">
-              <Button 
-                onClick={() => setIsAddPaperOpen(true)}
-                className="h-7 px-3 text-[11px] bg-[#1a1f2e] hover:bg-[#2a3142] text-white"
-              >
-                <Plus className="h-3 w-3 mr-2" />
-                Add paper
-              </Button>
-              <AddPaperDialog 
-                open={isAddPaperOpen} 
-                onOpenChange={setIsAddPaperOpen} 
-                categoryId={category?.id}
-                onPaperAdded={handlePaperAdded}
-              />
-            </div>
+            <Button
+              onClick={() => setIsAddPaperOpen(true)}
+              className="h-8 px-3 text-[11px] bg-[#1a1f2e] hover:bg-[#2a3142] text-white"
+            >
+              <Plus className="h-3.5 w-3.5 mr-1.5" />
+              Add Paper
+            </Button>
           </div>
         </div>
       ) : (
         <div className="p-6">
           <div className="w-full">
             <Tabs defaultValue="grid" className="w-full">
-              <div className="flex items-center justify-between mb-4">
-                <div className="text-[11px] text-[#666]">
-                  {papers.length} papers
-                </div>
-                <TabsList className="h-7 bg-[#2a2a2a] p-0.5 gap-0.5">
-                  <TabsTrigger 
-                    value="grid" 
-                    className="h-6 w-6 p-0 data-[state=active]:bg-[#333]"
-                  >
-                    <LayoutGrid className="h-3.5 w-3.5" />
-                  </TabsTrigger>
-                  <TabsTrigger 
-                    value="list" 
-                    className="h-6 w-6 p-0 data-[state=active]:bg-[#333]"
-                  >
-                    <List className="h-3.5 w-3.5" />
-                  </TabsTrigger>
-                </TabsList>
-              </div>
-
               <TabsContent value="grid">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <motion.div 
+                  className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
+                  variants={containerVariants}
+                  initial="hidden"
+                  animate="visible"
+                >
                   {papers.map((paper) => (
-                    <PaperCard
-                      key={paper.id}
-                      paper={{
-                        ...paper,
-                        citations: 0,
-                        impact: "low",
-                        url: "",
-                        topics: [],
-                        category: category,
-                        in_reading_list: true
-                      }}
-                      onSchedule={() => {}}
-                      onDelete={() => handleDeletePaper(paper)}
-                      isLoading={isLoading}
-                      context="category"
-                      showAddToListButton={false}
-                      variant="compact"
-                    />
+                    <motion.div key={paper.id} variants={itemVariants}>
+                      <PaperCard
+                        paper={{
+                          ...paper,
+                          citations: 0,
+                          impact: "low",
+                          url: "",
+                          topics: [],
+                          category: category,
+                          in_reading_list: true
+                        }}
+                        onSchedule={() => {}}
+                        onDelete={() => handleDeletePaper(paper)}
+                        isLoading={isLoading}
+                        context="category"
+                        showAddToListButton={false}
+                        variant="compact"
+                      />
+                    </motion.div>
                   ))}
-                </div>
+                </motion.div>
               </TabsContent>
 
               <TabsContent value="list">
-                <div className="space-y-2">
+                <motion.div 
+                  className="space-y-2"
+                  variants={containerVariants}
+                  initial="hidden"
+                  animate="visible"
+                >
                   {papers.map((paper) => (
-                    <PaperCard
-                      key={paper.id}
-                      paper={{
-                        ...paper,
-                        citations: 0,
-                        impact: "low",
-                        url: "",
-                        topics: [],
-                        category: category,
-                        in_reading_list: true
-                      }}
-                      onSchedule={() => {}}
-                      onDelete={() => handleDeletePaper(paper)}
-                      isLoading={isLoading}
-                      context="category"
-                      showAddToListButton={false}
-                      variant="compact"
-                    />
+                    <motion.div key={paper.id} variants={itemVariants}>
+                      <PaperCard
+                        paper={{
+                          ...paper,
+                          citations: 0,
+                          impact: "low",
+                          url: "",
+                          topics: [],
+                          category: category,
+                          in_reading_list: true
+                        }}
+                        onSchedule={() => {}}
+                        onDelete={() => handleDeletePaper(paper)}
+                        isLoading={isLoading}
+                        context="category"
+                        showAddToListButton={false}
+                        variant="compact"
+                      />
+                    </motion.div>
                   ))}
-                </div>
+                </motion.div>
               </TabsContent>
             </Tabs>
           </div>
@@ -501,9 +482,11 @@ export default function CategoryPage() {
     <DeletePaperDialog
       open={Boolean(paperToDelete)}
       onOpenChange={(open) => !open && setPaperToDelete(null)}
-      onConfirm={handleConfirmDelete}
+      paperId={paperToDelete?.id || ""}
       paperTitle={paperToDelete?.title || ""}
-      isDeleting={isDeleting}
+      onSuccess={() => {
+        setPapers(prevPapers => prevPapers.filter(p => p.id !== paperToDelete?.id));
+      }}
     />
   </MainLayout>;
 } 

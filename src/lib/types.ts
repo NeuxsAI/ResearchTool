@@ -35,4 +35,23 @@ export interface Annotation {
   page?: number;
   color?: string;
   type?: 'highlight' | 'note' | 'comment';
+}
+
+export interface Category {
+  id: string;
+  name: string;
+  description?: string;
+  color?: string;
+}
+
+export interface ReadingListItem {
+  id: string;
+  paper_id: string;
+  user_id: string;
+  created_at: string;
+  updated_at: string;
+  status?: 'unread' | 'in_progress' | 'completed';
+  scheduled_date?: string;
+  estimated_time?: number;
+  repeat?: "daily" | "weekly" | "monthly" | "none";
 } 

@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input"
 import { motion } from "framer-motion"
 import { useState } from "react"
 import { toast } from "sonner"
-import { createClient } from "@/lib/supabase/client"
+import supabase from "@/lib/supabase/client"
 import { Sparkles, ArrowRight, CheckCircle2 } from "lucide-react"
 
 const benefits = [
@@ -18,7 +18,6 @@ const benefits = [
 export function EarlyAccess() {
   const [email, setEmail] = useState("")
   const [isLoading, setIsLoading] = useState(false)
-  const supabase = createClient()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

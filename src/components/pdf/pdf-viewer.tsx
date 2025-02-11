@@ -68,11 +68,12 @@ export function PDFViewer({ url, onSelection, annotations = [], onAnnotationClic
 
     async function loadPDF() {
       try {
-        // Use the URL directly since it's already the PDF endpoint
-        console.log('Loading PDF:', url);
+        // Use our proxy route to avoid CORS issues
+        const proxyUrl = `/api/fetch-pdf?url=${encodeURIComponent(url)}`;
+        console.log('Loading PDF through proxy:', proxyUrl);
         
         const loadingTask = pdfjsLib.getDocument({
-          url: url,
+          url: proxyUrl,
           cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/cmaps/',
           cMapPacked: true,
         });
