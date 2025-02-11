@@ -14,7 +14,6 @@ import {
   Plus,
   ChevronDown,
   Search,
-  Trash,
   Home
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -23,7 +22,7 @@ import { NewCategoryDialog } from "@/components/library/new-category-dialog";
 import { ProfileMenu } from "@/components/auth/profile-menu";
 import { useUser } from "@/lib/context/user-context";
 import { useCategories } from "@/lib/context/categories-context";
-import { DeleteCategoryDialog } from "@/components/library/delete-category-dialog";
+import { CategoryMenu } from "@/components/library/category-menu";
 import type { Category } from "@/lib/supabase/types";
 
 interface MainLayoutProps {
@@ -91,6 +90,17 @@ export function MainLayout({ children }: MainLayoutProps) {
                 Home
               </Button>
               <Button
+                variant={pathname === routes.discover ? "secondary" : "ghost"}
+                className={`
+                  w-full justify-start h-6 px-2 text-[11px] font-normal
+                  ${pathname === routes.discover ? "bg-[#1a1f2e] text-white" : "text-[#4a5578] hover:bg-[#1a1f2e] hover:text-[#4a5578]"}
+                `}
+                onClick={() => handleNavigation(routes.discover)}
+              >
+                <Brain className="mr-2 h-3 w-3" />
+                For You
+              </Button>
+              <Button
                 variant={pathname === routes.recent ? "secondary" : "ghost"}
                 className={`
                   w-full justify-start h-6 px-2 text-[11px] font-normal
@@ -110,18 +120,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                 onClick={() => handleNavigation(routes.readingList)}
               >
                 <FileText className="mr-2 h-3 w-3" />
-                Reading list
-              </Button>
-              <Button
-                variant={pathname === routes.discover ? "secondary" : "ghost"}
-                className={`
-                  w-full justify-start h-6 px-2 text-[11px] font-normal
-                  ${pathname === routes.discover ? "bg-[#1a1f2e] text-white" : "text-[#4a5578] hover:bg-[#1a1f2e] hover:text-[#4a5578]"}
-                `}
-                onClick={() => handleNavigation(routes.discover)}
-              >
-                <Brain className="mr-2 h-3 w-3" />
-                Discover
+                Reading List
               </Button>
             </div>
 
@@ -147,7 +146,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                       <span>{category.name}</span>
                     </div>
                   </Button>
-                  <DeleteCategoryDialog categoryId={category.id} categoryName={category.name} />
+                  <CategoryMenu category={category} />
                 </div>
               ))}
               {categoriesContext?.isLoading && (

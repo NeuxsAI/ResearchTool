@@ -1,48 +1,33 @@
 "use client";
 
 import { useState } from "react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Trash } from "lucide-react";
-import { deleteCategory } from "@/lib/supabase/db";
+import { Loader2, Trash } from "lucide-react";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
+import { deleteCategory } from "@/lib/supabase/db";
 import { useCategories } from "@/lib/context/categories-context";
-import { createClient } from "@/lib/supabase/client";
 
 interface DeleteCategoryDialogProps {
   categoryId: string;
   categoryName: string;
+  trigger?: React.ReactNode;
 }
 
-export function DeleteCategoryDialog({ categoryId, categoryName }: DeleteCategoryDialogProps) {
+export function DeleteCategoryDialog({ categoryId, categoryName, trigger }: DeleteCategoryDialogProps) {
+  const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [isOpen, setIsOpen] = useState(false);
-  const router = useRouter();
-  const categoriesContext = useCategories();
-  const supabase = createClient();
+  const { refreshCategories } = useCategories();
 
   const handleDelete = async () => {
+    setIsLoading(true);
     try {
-      setIsLoading(true);
+      const result = await deleteCategory(categoryId);
+      if (result.error) throw result.error;
       
-      // Get the session token
-      const { data: { session } } = await supabase.auth.getSession();
-      const { error } = await deleteCategory(categoryId);
-      
-      if (error) throw error;
+      await refreshCategories();
       toast.success("Category deleted successfully");
-      setIsOpen(false);
-      categoriesContext?.refreshCategories?.();
-      router.push("/");
+      setOpen(false);
     } catch (error) {
       console.error("Error deleting category:", error);
       toast.error("Failed to delete category");
@@ -52,43 +37,49 @@ export function DeleteCategoryDialog({ categoryId, categoryName }: DeleteCategor
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-5 w-5 ml-2 text-gray-700 hover:text-red-500"
-          disabled={isLoading}
-        >
-          <Trash className="h-3.5 w-3.5" />
-          <span className="sr-only">Delete category</span>
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="bg-zinc-900 border-zinc-800 text-zinc-100">
-        <DialogHeader>
-          <DialogTitle>Delete Category</DialogTitle>
-          <DialogDescription className="text-zinc-400">
-            Are you sure you want to delete the category "{categoryName}"? This action cannot be undone.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
+        {trigger || (
           <Button
             variant="ghost"
-            onClick={() => setIsOpen(false)}
-            className="text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100"
-            disabled={isLoading}
+            size="sm"
+            className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 hover:bg-[#1a1f2e]"
+          >
+            <Trash className="h-3 w-3 text-[#4a5578]" />
+          </Button>
+        )}
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md bg-[#030014] border-[#1a1f2e] text-white">
+        <DialogHeader>
+          <DialogTitle>Delete Category</DialogTitle>
+          <DialogDescription className="text-[#4a5578]">
+            Are you sure you want to delete &quot;{categoryName}&quot;? This action cannot be undone.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex justify-end gap-2 mt-4">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setOpen(false)}
+            className="h-8 px-3 text-xs hover:bg-[#1a1f2e] text-[#4a5578] hover:text-white"
           >
             Cancel
           </Button>
           <Button
-            variant="destructive"
-            onClick={handleDelete}
+            type="button"
+            size="sm"
             disabled={isLoading}
-            className="bg-red-600 hover:bg-red-700 text-white"
+            onClick={handleDelete}
+            className="h-8 px-3 text-xs bg-red-500 hover:bg-red-600"
           >
-            {isLoading ? "Deleting..." : "Delete"}
+            {isLoading ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              "Delete"
+            )}
           </Button>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );
