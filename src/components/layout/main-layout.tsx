@@ -82,7 +82,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                 variant={pathname === routes.home ? "secondary" : "ghost"}
                 className={`
                   w-full justify-start h-6 px-2 text-[11px] font-normal
-                  ${pathname === routes.home ? "bg-[#1a1f2e] text-white" : "text-[#4a5578] hover:bg-[#1a1f2e] hover:text-[#4a5578]"}
+                  ${pathname === routes.home ? "text-white hover:bg-[#1a1f2e]" : "text-[#4a5578] hover:bg-[#1a1f2e] hover:text-[#4a5578]"}
                 `}
                 onClick={() => handleNavigation(routes.home)}
               >
@@ -93,7 +93,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                 variant={pathname === routes.discover ? "secondary" : "ghost"}
                 className={`
                   w-full justify-start h-6 px-2 text-[11px] font-normal
-                  ${pathname === routes.discover ? "bg-[#1a1f2e] text-white" : "text-[#4a5578] hover:bg-[#1a1f2e] hover:text-[#4a5578]"}
+                  ${pathname === routes.discover ? "text-white hover:bg-[#1a1f2e]" : "text-[#4a5578] hover:bg-[#1a1f2e] hover:text-[#4a5578]"}
                 `}
                 onClick={() => handleNavigation(routes.discover)}
               >
@@ -104,7 +104,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                 variant={pathname === routes.recent ? "secondary" : "ghost"}
                 className={`
                   w-full justify-start h-6 px-2 text-[11px] font-normal
-                  ${pathname === routes.recent ? "bg-[#1a1f2e] text-white" : "text-[#4a5578] hover:bg-[#1a1f2e] hover:text-[#4a5578]"}
+                  ${pathname === routes.recent ? "text-white hover:bg-[#1a1f2e]" : "text-[#4a5578] hover:bg-[#1a1f2e] hover:text-[#4a5578]"}
                 `}
                 onClick={() => handleNavigation(routes.recent)}
               >
@@ -115,7 +115,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                 variant={pathname === routes.readingList ? "secondary" : "ghost"}
                 className={`
                   w-full justify-start h-6 px-2 text-[11px] font-normal
-                  ${pathname === routes.readingList ? "bg-[#1a1f2e] text-white" : "text-[#4a5578] hover:bg-[#1a1f2e] hover:text-[#4a5578]"}
+                  ${pathname === routes.readingList ? "text-white hover:bg-[#1a1f2e]" : "text-[#4a5578] hover:bg-[#1a1f2e] hover:text-[#4a5578]"}
                 `}
                 onClick={() => handleNavigation(routes.readingList)}
               >
