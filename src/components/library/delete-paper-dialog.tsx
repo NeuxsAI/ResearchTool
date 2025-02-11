@@ -27,7 +27,7 @@ export function DeletePaperDialog({
 }: DeletePaperDialogProps) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="bg-[#1c1c1c] border-[#2a2a2a]">
+      <AlertDialogContent className="bg-[#030014] border-[#2a2a2a]">
         <AlertDialogHeader>
           <AlertDialogTitle className="text-white">Delete Paper</AlertDialogTitle>
           <AlertDialogDescription className="text-[#888]">

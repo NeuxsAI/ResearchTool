@@ -83,7 +83,7 @@ export function ChatView({
     <div className="relative flex flex-col" style={{ height: "calc(100vh - 82px)" }}>
       {/* Chat Header */}
       {messages.length > 0 && onSaveChat && (
-        <div className="sticky top-0 z-10 flex items-center justify-between px-3 py-1.5 border-b border-[#2a2a2a] bg-[#1c1c1c]">
+        <div className="sticky top-0 z-10 flex items-center justify-between px-3 py-1.5 border-b border-[#2a2a2a] bg-[#030014]">
           <p className="text-[10px] text-[#666]">{messages.length} messages</p>
           <Button
             variant="ghost"
@@ -128,7 +128,7 @@ export function ChatView({
                   <button
                     key={index}
                     onClick={() => handlePromptClick(prompt)}
-                    className="p-2 text-[10px] bg-[#2a2a2a] hover:bg-[#333] rounded text-[#ccc] transition-colors duration-200 border border-[#333] hover:border-[#444] text-left"
+                    className="p-2 text-[10px] bg-[#1a1f2e] hover:bg-[#2a3142] rounded text-[#ccc] transition-colors duration-200 border border-[#333] hover:border-[#444] text-left"
                   >
                     {prompt}
                   </button>
@@ -157,7 +157,7 @@ export function ChatView({
                 </span>
               </div>
               <div className="flex-1 min-w-0">
-                <div className="text-[11px] text-white leading-relaxed whitespace-pre-wrap prose prose-invert max-w-none prose-p:my-1 prose-pre:my-1 prose-pre:bg-[#1c1c1c] prose-pre:border prose-pre:border-[#333]">
+                <div className="text-[11px] text-white leading-relaxed whitespace-pre-wrap prose prose-invert max-w-none prose-p:my-1 prose-pre:my-1 prose-pre:bg-[#030014] prose-pre:border prose-pre:border-[#333]">
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
                     components={{
@@ -169,7 +169,7 @@ export function ChatView({
                             style={oneDark}
                             language={match[1]}
                             PreTag="div"
-                            className="text-[10px] !bg-[#1c1c1c] !p-2 rounded border border-[#333] overflow-x-auto max-w-full"
+                            className="text-[10px] !bg-[#030014] !p-2 rounded border border-[#333] overflow-x-auto max-w-full"
                             customStyle={{
                               margin: 0,
                               background: '#1c1c1c',
@@ -180,7 +180,7 @@ export function ChatView({
                             {String(children).replace(/\n$/, '')}
                           </SyntaxHighlighter>
                         ) : (
-                          <code {...props} className="bg-[#1c1c1c] px-1 py-0.5 rounded text-[10px]">
+                          <code {...props} className="bg-[#030014] px-1 py-0.5 rounded text-[10px]">
                             {children}
                           </code>
                         );
@@ -206,7 +206,7 @@ export function ChatView({
       </div>
 
       {/* Input */}
-      <div className="flex-shrink-0 p-3 border-t border-[#2a2a2a] bg-[#1c1c1c]">
+      <div className="flex-shrink-0 p-3 border-t border-[#2a2a2a] bg-[#030014]">
         {highlightedText && highlightedText.trim() !== "" && (
           <div className="mb-2 p-2 bg-[#2a2a2a] border-l-2 border-violet-500/30 rounded relative group">
             <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">

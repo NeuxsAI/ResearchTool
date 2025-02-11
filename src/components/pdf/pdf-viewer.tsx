@@ -256,7 +256,7 @@ export function PDFViewer({ url, onSelection, annotations = [], onAnnotationClic
   };
 
   return (
-    <div className="relative flex flex-col items-center p-4 overflow-auto bg-[#1c1c1c] min-h-full">
+    <div className="relative flex flex-col items-center p-4 overflow-auto bg-[#030014] min-h-full">
     {isLoading && <LoadingOverlay message="Processing PDF..." />}
     {!isLoading && Array.from({ length: numPages }, (_, i) => i + 1).map((pageNum) => (
       <div 

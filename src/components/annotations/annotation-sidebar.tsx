@@ -85,7 +85,7 @@ export function AnnotationSidebar({
 
   return (
     <div 
-      className={`fixed right-0 top-0 h-full w-[400px] bg-[#1c1c1c] border-l border-[#2a2a2a] transform transition-transform duration-200 ease-in-out flex flex-col ${
+      className={`fixed right-0 top-0 h-full w-[400px] bg-[#030014] border-l border-[#2a2a2a] transform transition-transform duration-200 ease-in-out flex flex-col ${
         open ? "translate-x-0" : "translate-x-full"
       }`}
     >
@@ -106,7 +106,7 @@ export function AnnotationSidebar({
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
-        <TabsList className="flex-shrink-0 flex bg-[#1c1c1c] border-b border-[#2a2a2a] justify-start w-full">
+        <TabsList className="flex-shrink-0 flex bg-[#030014] border-b border-[#2a2a2a] justify-start w-full">
           <TabsTrigger 
             value="annotations"
             className="h-[24px] px-3 text-[8px] uppercase tracking-wider font-medium data-[state=active]:bg-transparent rounded-none border-b border-transparent data-[state=active]:border-violet-500"
@@ -192,7 +192,7 @@ export function AnnotationSidebar({
           </div>
 
           {/* Add Comment - Fixed at bottom */}
-          <div className="flex-shrink-0 p-3 border-t border-[#2a2a2a] bg-[#1c1c1c]">
+          <div className="flex-shrink-0 p-3 border-t border-[#2a2a2a] bg-[#030014]">
             {highlightedText && highlightedText.trim() !== "" && (
               <div className="mb-2 p-2 bg-[#2a2a2a] border-l border-violet-500/30 rounded relative group">
                 <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">

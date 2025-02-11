@@ -15,11 +15,12 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { FilterSortDialog } from "@/components/library/filter-sort-dialog";
 import { PaperCard } from "@/components/paper-card";
-import { Paper } from "@/lib/types";
+import type { Paper } from "@/lib/supabase/types";
 import { useCategories } from "@/lib/context/categories-context";
 import { cn } from "@/lib/utils";
 import { DeletePaperDialog } from "@/components/library/delete-paper-dialog";
 import { toast } from "sonner";
+import { cache, CACHE_KEYS } from "@/lib/cache";
 
 interface Category {
   id: string;
@@ -63,26 +64,56 @@ const itemVariants = {
 };
 
 // Preload function for parallel data fetching
-async function preloadData() {
-  const [papersResult, readingListResult, categoriesResult] = await Promise.all([
-    getPapers(),
+async function preloadData(refresh = false) {
+  const cachedPapers = !refresh && cache.get<Paper[]>(CACHE_KEYS.PAPERS);
+  const cachedCategories = !refresh && cache.get<Category[]>(CACHE_KEYS.CATEGORIES);
+  const cachedReadingList = !refresh && cache.get<ReadingListItem[]>(CACHE_KEYS.READING_LIST);
+  const cachedAnnotations = !refresh && cache.get<Annotation[]>(CACHE_KEYS.ANNOTATIONS);
+
+  if (cachedPapers && cachedCategories && cachedReadingList && cachedAnnotations) {
+    return {
+      papers: cachedPapers,
+      categories: cachedCategories,
+      readingList: cachedReadingList,
+      annotations: cachedAnnotations
+    };
+  }
+
+  // First get papers to get their IDs
+  const papersResult = await getPapers();
+  const papers = papersResult.data || [];
+
+  // Then load everything else in parallel including annotations for each paper
+  const [categoriesResult, readingListResult, annotationsResults] = await Promise.all([
+    getCategories(),
     getReadingList(),
-    getCategories()
+    Promise.all(papers.map(paper => getAnnotationsByPaper(paper.id)))
   ]);
 
-  return {
-    papers: papersResult.data || [],
-    readingList: readingListResult.data || [],
-    categories: categoriesResult.data || []
-  };
+  const categories = categoriesResult.data || [];
+  const readingList = readingListResult.data || [];
+  const annotations = annotationsResults
+    .filter(result => !result.error)
+    .flatMap(result => result.data || [])
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+  if (!refresh) {
+    cache.set(CACHE_KEYS.PAPERS, papers);
+    cache.set(CACHE_KEYS.CATEGORIES, categories);
+    cache.set(CACHE_KEYS.READING_LIST, readingList);
+    cache.set(CACHE_KEYS.ANNOTATIONS, annotations);
+  }
+
+  return { papers, categories, readingList, annotations };
 }
 
 export default function LibraryPage() {
   const router = useRouter();
-  const { categories, isLoading: isCategoriesLoading } = useCategories();
+  const { categories: contextCategories, isLoading: isCategoriesLoading } = useCategories();
   // State
   const [isAddPaperOpen, setIsAddPaperOpen] = useState(false);
   const [papers, setPapers] = useState<Paper[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [readingList, setReadingList] = useState<ReadingListItem[]>([]);
   const [recentAnnotations, setRecentAnnotations] = useState<Annotation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -94,49 +125,38 @@ export default function LibraryPage() {
   const [paperToDelete, setPaperToDelete] = useState<Paper | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Optimized data loading
-  useEffect(() => {
-    let mounted = true;
-
-    async function loadData() {
-      try {
-        setIsLoading(true);
-        
-        const { papers, readingList, categories } = await preloadData();
-        
-        if (!mounted) return;
-
-        // Set initial data
-        setPapers(papers);
-        setReadingList(readingList);
-
-        // Load annotations in parallel for all papers
-        const annotationsPromises = papers.map(paper => getAnnotationsByPaper(paper.id));
-        const annotationsResults = await Promise.all(annotationsPromises);
-        
-        if (!mounted) return;
-
-        const allAnnotations = annotationsResults
-          .filter(result => !result.error)
-          .flatMap(result => result.data || [])
-          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-          .slice(0, 5);
-
-        setRecentAnnotations(allAnnotations);
-      } catch (error) {
-        console.error("Error in loadData:", error);
-      } finally {
-        if (mounted) {
-          setIsLoading(false);
-        }
-      }
+  const loadData = async (refresh = false) => {
+    try {
+      setIsLoading(true);
+      const { papers, categories, readingList, annotations } = await preloadData(refresh);
+      setPapers(papers);
+      setCategories(categories);
+      setReadingList(readingList);
+      setRecentAnnotations(annotations);
+    } catch (error) {
+      console.error('Error loading data:', error);
+      toast.error('Failed to load data');
+    } finally {
+      setIsLoading(false);
     }
+  };
 
-    loadData();
-
-    return () => {
-      mounted = false;
-    };
+  useEffect(() => {
+    // Try to load from cache first
+    const cachedPapers = cache.get<Paper[]>(CACHE_KEYS.PAPERS);
+    const cachedCategories = cache.get<Category[]>(CACHE_KEYS.CATEGORIES);
+    const cachedReadingList = cache.get<ReadingListItem[]>(CACHE_KEYS.READING_LIST);
+    const cachedAnnotations = cache.get<Annotation[]>(CACHE_KEYS.ANNOTATIONS);
+    
+    if (cachedPapers && cachedCategories && cachedReadingList && cachedAnnotations) {
+      setPapers(cachedPapers);
+      setCategories(cachedCategories);
+      setReadingList(cachedReadingList);
+      setRecentAnnotations(cachedAnnotations);
+      setIsLoading(false);
+    } else {
+      loadData(false);
+    }
   }, []);
 
   // Filter and sort papers
@@ -262,10 +282,6 @@ export default function LibraryPage() {
 
       // Update local state
       setPapers(prevPapers => prevPapers.filter(p => p.id !== paperToDelete.id));
-      setRecentAnnotations(prevAnnotations => 
-        prevAnnotations.filter(a => a.paper_id !== paperToDelete.id)
-      );
-      
       toast.success("Paper deleted successfully");
     } catch (error) {
       console.error("Error deleting paper:", error);
@@ -298,7 +314,7 @@ export default function LibraryPage() {
       transition={{ duration: 0.3 }}
     >
       {/* Header */}
-      <div className="flex-shrink-0 border-b border-[#2a2a2a] bg-[#1c1c1c]">
+      <div className="flex-shrink-0 border-b border-[#1a1f2e] bg-[#030014]">
         <motion.div 
           className="p-4"
           initial={{ y: -20, opacity: 0 }}
@@ -308,13 +324,13 @@ export default function LibraryPage() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <h1 className="text-lg font-medium text-white">My Library</h1>
-              <p className="text-xs text-[#888]">
+              <p className="text-xs text-[#4a5578]">
                 Browse and manage your research papers and ideas
               </p>
             </div>
             <Button 
               onClick={() => setIsAddPaperOpen(true)}
-              className="h-8 px-3 text-[11px] bg-[#2a2a2a] hover:bg-[#333] text-white"
+              className="h-8 px-3 text-[11px] bg-[#1a1f2e] hover:bg-[#2a3142] text-white"
             >
               <Plus className="h-3.5 w-3.5 mr-2" />
               Add paper
@@ -324,20 +340,20 @@ export default function LibraryPage() {
           {/* Search and Controls */}
           <div className="flex items-center gap-2">
             <div className="flex-1 relative">
-              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#666]" />
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#4a5578]" />
               <Input
                 type="text"
                 placeholder="Search papers..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-8 pl-8 text-[11px] bg-[#2a2a2a] border-[#333] text-white placeholder:text-[#666]"
+                className="h-8 pl-8 text-[11px] bg-[#1a1f2e] border-[#2a3142] text-white placeholder:text-[#4a5578]"
               />
             </div>
 
             {/* Filter and Sort Button */}
             <Button
               onClick={() => setFilterDialogOpen(true)}
-              className="h-8 px-3 text-[11px] bg-[#2a2a2a] hover:bg-[#333] text-white"
+              className="h-8 px-3 text-[11px] bg-[#1a1f2e] hover:bg-[#2a3142] text-white"
             >
               <SlidersHorizontal className="h-3 w-3 mr-1" />
               Filter & Sort
@@ -348,9 +364,9 @@ export default function LibraryPage() {
               variant="ghost"
               size="sm"
               onClick={() => setViewMode(prev => prev === "list" ? "grid" : "list")}
-              className="h-8 w-8 p-0 bg-[#2a2a2a] border border-[#333] hover:bg-[#333] flex items-center justify-center"
+              className="h-8 w-8 p-0 bg-[#1a1f2e] border border-[#2a3142] hover:bg-[#2a3142] flex items-center justify-center"
             >
-              <Grid2x2 className="h-3.5 w-3.5 text-[#888]" />
+              <Grid2x2 className="h-3.5 w-3.5 text-[#4a5578]" />
             </Button>
           </div>
         </motion.div>
@@ -365,7 +381,7 @@ export default function LibraryPage() {
           animate={{ x: 0, opacity: 1 }}
           transition={{ duration: 0.3, delay: 0.2 }}
         >
-          <div className="w-[260px] p-4 border-r border-[#2a2a2a] bg-[#1c1c1c] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] h-full">
+          <div className="w-[260px] p-4 border-r border-[#2a2a2a] bg-[#030014] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] h-full">
             <h3 className="text-sm font-medium text-white mb-4">Recent Activity</h3>
             
             {/* Reading Progress */}

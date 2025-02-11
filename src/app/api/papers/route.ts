@@ -6,9 +6,6 @@ import { cookies } from 'next/headers';
 
 export async function POST(request: Request) {
   try {
-    const cookieStore = cookies();
-    const supabase = createClient(cookieStore);
-    
     // Get auth token from request header
     const authHeader = request.headers.get('Authorization');
     if (!authHeader?.startsWith('Bearer ')) {
@@ -19,9 +16,12 @@ export async function POST(request: Request) {
       );
     }
 
-    // Get the token and validate user
+    // Get the token and create Supabase client with it
     const token = authHeader.split(' ')[1];
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    const supabase = createClient(token);
+    
+    // Validate user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
     
     if (authError || !user) {
       console.error('Auth error:', authError);
@@ -42,6 +42,7 @@ export async function POST(request: Request) {
     const yearStr = formData.get('year') as string;
     const abstract = formData.get('abstract') as string;
     const categoryId = formData.get('categoryId') as string;
+    const arxivId = formData.get('arxiv_id') as string;
 
     // Parse and validate the data
     if (!title?.trim()) {
@@ -51,14 +52,11 @@ export async function POST(request: Request) {
       );
     }
 
-    let authors: string[];
+    let authors: string[] = [];
     try {
       authors = JSON.parse(authorsStr);
-      if (!Array.isArray(authors)) {
-        throw new Error('Authors must be an array');
-      }
-    } catch (error) {
-      console.error('Error parsing authors:', error);
+    } catch (e) {
+      console.error('Error parsing authors:', e);
       return NextResponse.json(
         { error: 'Invalid authors format' },
         { status: 400 }
@@ -68,101 +66,36 @@ export async function POST(request: Request) {
     const year = parseInt(yearStr);
     if (isNaN(year)) {
       return NextResponse.json(
-        { error: 'Invalid year format' },
+        { error: 'Invalid year' },
         { status: 400 }
       );
     }
 
-    if (!file && !url) {
-      return NextResponse.json(
-        { error: 'Either a file or URL is required' },
-        { status: 400 }
-      );
-    }
-
-    // Get the PDF URL
-    let pdfUrl: string;
-    if (file) {
-      console.log('Uploading file:', file.name, file.size);
-      try {
-        pdfUrl = await uploadPDF(file, user.id, token);
-        console.log('File uploaded successfully:', pdfUrl);
-      } catch (uploadError) {
-        console.error('Upload error:', uploadError);
-        return NextResponse.json(
-          { error: 'Failed to upload PDF: ' + (uploadError instanceof Error ? uploadError.message : 'Unknown error') },
-          { status: 500 }
-        );
-      }
-    } else if (url) {
-      try {
-        new URL(url);
-        pdfUrl = url;
-        console.log('Using provided URL:', url);
-      } catch {
-        return NextResponse.json(
-          { error: 'Invalid URL format' },
-          { status: 400 }
-        );
-      }
-    } else {
-      return NextResponse.json(
-        { error: 'No PDF source provided' },
-        { status: 400 }
-      );
-    }
-
-    // Create paper record in database
-    const { data: paper, error: dbError } = await createPaper({
+    // Create the paper
+    const paperData = {
       title,
       authors,
       year,
-      abstract,
-      category_id: categoryId,
-      user_id: user.id,
-      url: pdfUrl,
-    }, token);
+      abstract: abstract || '',
+      url: url || '',
+      category_id: categoryId || null,
+      arxiv_id: arxivId || null,
+      user_id: user.id
+    };
 
-    if (dbError) {
-      console.error('Database error:', dbError);
+    const { data: paper, error: paperError } = await createPaper(paperData, token);
+    
+    if (paperError) {
+      console.error('Error creating paper:', paperError);
       return NextResponse.json(
-        { error: 'Failed to save paper to database: ' + dbError.message },
+        { error: `Failed to save paper to database: ${paperError.message}` },
         { status: 500 }
       );
     }
 
-    if (!paper) {
-      console.error('No paper data returned from database');
-      return NextResponse.json(
-        { error: 'Failed to create paper: No data returned' },
-        { status: 500 }
-      );
-    }
-
-    // Index paper in RAG service
-    try {
-      const ragResponse = await fetch(`${process.env.NEXT_PUBLIC_RAG_API_URL}/papers/${paper.id}/index-pdf`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          pdf_url: pdfUrl
-        })
-      });
-
-      if (!ragResponse.ok) {
-        const error = await ragResponse.text();
-        console.error('Failed to index paper in RAG service:', error);
-      }
-    } catch (ragError) {
-      console.error('Error indexing paper in RAG:', ragError);
-    }
-
-    console.log('Paper created successfully:', paper);
     return NextResponse.json({ paper });
   } catch (error) {
-    console.error('Error creating paper:', error);
+    console.error('Error in POST /api/papers:', error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to create paper' },
       { status: 500 }

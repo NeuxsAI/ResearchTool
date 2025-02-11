@@ -1,42 +1,25 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, MessageSquare, Pencil, LayoutGrid, List } from "lucide-react";
+import { FileText, Plus, Grid2x2, Search, MessageSquare, LayoutGrid, List } from "lucide-react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { AddPaperDialog } from "@/components/library/add-paper-dialog";
-import { getPapers, getCategories, deletePaper } from "@/lib/supabase/db";
+import { getPapers, getCategories, getAnnotationsByPaper, getReadingList, deletePaper, addToReadingList } from "@/lib/supabase/db";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Skeleton } from "@/components/ui/skeleton";
-import { PaperCard } from "@/components/paper-card";
-import { cache, CACHE_KEYS } from '@/lib/cache';
-import { DeletePaperDialog } from "@/components/library/delete-paper-dialog";
 import { toast } from "sonner";
-
-interface Paper {
-  id: string;
-  title?: string;
-  authors?: string[];
-  year?: number;
-  category?: string;
-  category_id?: string;
-  category_color?: string;
-  annotations_count?: number;
-  url?: string;
-  created_at?: string;
-  updated_at?: string;
-  abstract?: string;
-  citations?: number;
-  institution?: string;
-  impact?: "high" | "low";
-  topics?: string[];
-  scheduled_date?: string;
-  estimated_time?: number;
-  repeat?: "daily" | "weekly" | "monthly" | "none";
-  in_reading_list?: boolean;
-}
+import { cache, CACHE_KEYS } from "@/lib/cache";
+import type { Paper as DbPaper, Annotation, ReadingListItem } from "@/lib/supabase/types";
+import type { Paper } from "@/lib/types";
+import { PaperCard } from "@/components/paper-card";
+import { DeletePaperDialog } from "@/components/library/delete-paper-dialog";
 
 // Animation variants
 const containerVariants = {
@@ -60,84 +43,112 @@ const itemVariants = {
   }
 };
 
+// Update the cache keys
+const RECENT_CACHE_KEYS = {
+  ...CACHE_KEYS,
+  ANNOTATIONS: "recent_annotations",
+  READING_LIST: "recent_reading_list"
+} as const;
+
 // Preload function for parallel data fetching
-async function preloadData() {
-  const [papersResult, categoriesResult] = await Promise.all([
-    getPapers(),
-    getCategories()
+async function preloadData(refresh = false) {
+  const cachedPapers = !refresh && cache.get<DbPaper[]>(RECENT_CACHE_KEYS.RECENT_PAPERS);
+  const cachedAnnotations = !refresh && cache.get<Annotation[]>(RECENT_CACHE_KEYS.ANNOTATIONS);
+  const cachedReadingList = !refresh && cache.get<ReadingListItem[]>(RECENT_CACHE_KEYS.READING_LIST);
+
+  if (cachedPapers && cachedAnnotations && cachedReadingList) {
+    return {
+      papers: cachedPapers,
+      annotations: cachedAnnotations,
+      readingList: cachedReadingList
+    };
+  }
+
+  // First get papers to get their IDs
+  const papersResult = await getPapers();
+  const papers = papersResult.data || [];
+
+  // Then load everything else in parallel
+  const [annotationsResults, readingListResult] = await Promise.all([
+    Promise.all(papers.map(paper => getAnnotationsByPaper(paper.id))),
+    getReadingList()
   ]);
 
-  // Sort and process papers
-  const sortedPapers = (papersResult.data || [])
-    .map(paper => {
-      const category = categoriesResult.data?.find(c => c.id === paper.category_id);
-      return {
-        ...paper,
-        category: category?.name,
-        category_color: category?.color
-      };
-    })
-    .sort((a, b) => {
-      const aDate = new Date(a.updated_at || a.created_at || "").getTime();
-      const bDate = new Date(b.updated_at || b.created_at || "").getTime();
-      return bDate - aDate;
-    })
-    .slice(0, 10);
+  const annotations = annotationsResults
+    .filter(result => !result.error)
+    .flatMap(result => result.data || [])
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  const readingList = readingListResult.data || [];
 
-  cache.set(CACHE_KEYS.RECENT_PAPERS, sortedPapers);
-  return { papers: sortedPapers, categories: categoriesResult.data };
+  if (!refresh) {
+    cache.set(RECENT_CACHE_KEYS.RECENT_PAPERS, papers);
+    cache.set(RECENT_CACHE_KEYS.ANNOTATIONS, annotations);
+    cache.set(RECENT_CACHE_KEYS.READING_LIST, readingList);
+  }
+
+  return { papers, annotations, readingList };
+}
+
+// Helper function to transform DB paper to UI paper
+function transformPaper(paper: DbPaper, readingList: ReadingListItem[]): Paper {
+  return {
+    ...paper,
+    citations: paper.citations || 0,
+    impact: paper.impact || "low",
+    url: paper.url || "",
+    topics: paper.topics || [],
+    in_reading_list: readingList.some(item => item.paper_id === paper.id)
+  } as Paper;
 }
 
 export default function RecentPage() {
   const router = useRouter();
   const [isAddPaperOpen, setIsAddPaperOpen] = useState(false);
-  const [recentPapers, setRecentPapers] = useState<Paper[]>([]);
+  const [papers, setPapers] = useState<DbPaper[]>([]);
+  const [annotations, setAnnotations] = useState<Annotation[]>([]);
+  const [readingList, setReadingList] = useState<ReadingListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [paperToDelete, setPaperToDelete] = useState<Paper | null>(null);
+  const [paperToDelete, setPaperToDelete] = useState<DbPaper | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  useEffect(() => {
-    let mounted = true;
-
-    async function loadPapers() {
-      try {
-        setIsLoading(true);
-        
-        // Try to get from cache first
-        const cachedPapers = cache.get(CACHE_KEYS.RECENT_PAPERS);
-        if (cachedPapers && mounted) {
-          setRecentPapers(cachedPapers);
-          setIsLoading(false);
-          return;
-        }
-
-        const { papers } = await preloadData();
-        if (mounted) {
-          setRecentPapers(papers);
-        }
-      } catch (error) {
-        console.error("Error loading recent papers:", error);
-      } finally {
-        if (mounted) {
-          setIsLoading(false);
-        }
-      }
+  const loadData = async (refresh = false) => {
+    try {
+      setIsLoading(true);
+      const { papers, annotations, readingList } = await preloadData(refresh);
+      setPapers(papers);
+      setAnnotations(annotations);
+      setReadingList(readingList);
+    } catch (error) {
+      console.error('Error loading data:', error);
+      toast.error('Failed to load data');
+    } finally {
+      setIsLoading(false);
     }
-    
-    loadPapers();
+  };
 
-    return () => {
-      mounted = false;
-    };
+  useEffect(() => {
+    // Try to load from cache first
+    const cachedPapers = cache.get<DbPaper[]>(RECENT_CACHE_KEYS.RECENT_PAPERS);
+    const cachedAnnotations = cache.get<Annotation[]>(RECENT_CACHE_KEYS.ANNOTATIONS);
+    const cachedReadingList = cache.get<ReadingListItem[]>(RECENT_CACHE_KEYS.READING_LIST);
+    
+    if (cachedPapers && cachedAnnotations && cachedReadingList) {
+      setPapers(cachedPapers);
+      setAnnotations(cachedAnnotations);
+      setReadingList(cachedReadingList);
+      setIsLoading(false);
+    } else {
+      loadData(false);
+    }
   }, []);
 
-  const handlePaperClick = (paper: Paper) => {
+  const handlePaperClick = (paper: DbPaper) => {
     // Pre-fetch the paper page for instant navigation
     router.prefetch(`/paper/${paper.id}`);
     router.push(`/paper/${paper.id}`);
   };
 
-  const handleDeletePaper = async (paper: Paper) => {
+  const handleDeletePaper = async (paper: DbPaper) => {
     setPaperToDelete(paper);
   };
 
@@ -153,7 +164,7 @@ export default function RecentPage() {
       }
 
       // Update local state
-      setRecentPapers(prevPapers => prevPapers.filter(p => p.id !== paperToDelete.id));
+      setPapers(prevPapers => prevPapers.filter(p => p.id !== paperToDelete.id));
       toast.success("Paper deleted successfully");
     } catch (error) {
       console.error("Error deleting paper:", error);
@@ -191,12 +202,12 @@ export default function RecentPage() {
   return (
     <MainLayout>
       <motion.div 
-        className="h-full bg-[#1c1c1c]"
+        className="h-full bg-[#030014]"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.3 }}
       >
-        <div className="p-6 border-b border-[#2a2a2a]">
+        <div className="p-6 border-b border-[#1a1f2e]">
           <motion.div 
             className="w-full"
             initial={{ y: -20, opacity: 0 }}
@@ -207,13 +218,13 @@ export default function RecentPage() {
               <h1 className="text-xl font-semibold text-[#eee]">Recent</h1>
               <Button 
                 onClick={() => setIsAddPaperOpen(true)}
-                className="h-8 px-3 text-[11px] bg-[#2a2a2a] hover:bg-[#333] text-white"
+                className="h-8 px-3 text-[11px] bg-[#1a1f2e] hover:bg-[#2a3142] text-white"
               >
                 <Plus className="h-3.5 w-3.5 mr-2" />
                 Add paper
               </Button>
             </div>
-            <p className="max-w-3xl text-[11px] leading-relaxed text-[#888]">
+            <p className="max-w-3xl text-[11px] leading-relaxed text-[#4a5578]">
               Recently viewed and modified papers.
             </p>
           </motion.div>
@@ -228,19 +239,19 @@ export default function RecentPage() {
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.2 }}
               >
-                <div className="text-[11px] text-[#666]">
-                  {recentPapers.length} papers
+                <div className="text-[11px] text-[#4a5578]">
+                  {papers.length} papers
                 </div>
-                <TabsList className="h-7 bg-[#2a2a2a] p-0.5 gap-0.5">
+                <TabsList className="h-7 bg-[#1a1f2e] p-0.5 gap-0.5">
                   <TabsTrigger 
                     value="grid" 
-                    className="h-6 w-6 p-0 data-[state=active]:bg-[#333]"
+                    className="h-6 w-6 p-0 data-[state=active]:bg-[#2a3142]"
                   >
                     <LayoutGrid className="h-3.5 w-3.5" />
                   </TabsTrigger>
                   <TabsTrigger 
                     value="list" 
-                    className="h-6 w-6 p-0 data-[state=active]:bg-[#333]"
+                    className="h-6 w-6 p-0 data-[state=active]:bg-[#2a3142]"
                   >
                     <List className="h-3.5 w-3.5" />
                   </TabsTrigger>
@@ -248,50 +259,34 @@ export default function RecentPage() {
               </motion.div>
 
               <TabsContent value="grid">
-                {isLoading ? (
-                  renderSkeletons()
-                ) : (
-                  <motion.div 
-                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
-                    variants={containerVariants}
-                    initial="hidden"
-                    animate="visible"
-                  >
-                    {recentPapers.map((paper) => (
-                      <motion.div 
-                        key={paper.id}
-                        variants={itemVariants}
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                      >
-                        <PaperCard
-                          paper={{
-                            ...paper,
-                            citations: paper.citations || 0,
-                            impact: paper.impact || "low",
-                            topics: paper.topics || [],
-                            url: paper.url || "",
-                            scheduled_date: paper.scheduled_date,
-                            estimated_time: paper.estimated_time,
-                            repeat: paper.repeat,
-                            in_reading_list: paper.in_reading_list,
-                            category: paper.category_id ? {
-                              id: paper.category_id,
-                              name: paper.category || "",
-                              color: paper.category_color
-                            } : undefined
-                          }}
-                          onSchedule={(date, time, repeat) => {}}
-                          onDelete={() => handleDeletePaper(paper)}
-                          isLoading={isLoading}
-                          context="recent"
-                          showAddToListButton={false}
-                          variant="compact"
-                        />
-                      </motion.div>
-                    ))}
-                  </motion.div>
-                )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {papers.map((paper) => (
+                    <motion.div 
+                      key={paper.id}
+                      variants={itemVariants}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      className="h-full"
+                    >
+                      <PaperCard
+                        paper={transformPaper(paper, readingList)}
+                        onAddToList={async () => {
+                          const result = await addToReadingList(paper.id);
+                          if (!result.error) {
+                            setReadingList(prev => [...prev, result.data!]);
+                          }
+                        }}
+                        onDelete={() => handleDeletePaper(paper)}
+                        isLoading={isLoading}
+                        context="main"
+                        showScheduleButton={!readingList.some(item => item.paper_id === paper.id)}
+                        showAddToListButton={!readingList.some(item => item.paper_id === paper.id)}
+                        variant="default"
+                        className="h-full"
+                      />
+                    </motion.div>
+                  ))}
+                </div>
               </TabsContent>
 
               <TabsContent value="list">
@@ -324,7 +319,7 @@ export default function RecentPage() {
                     initial="hidden"
                     animate="visible"
                   >
-                    {recentPapers.map((paper) => (
+                    {papers.map((paper) => (
                       <motion.div
                         key={paper.id}
                         variants={itemVariants}
@@ -332,28 +327,19 @@ export default function RecentPage() {
                         whileTap={{ scale: 0.99 }}
                       >
                         <PaperCard
-                          paper={{
-                            ...paper,
-                            citations: paper.citations || 0,
-                            impact: paper.impact || "low",
-                            topics: paper.topics || [],
-                            url: paper.url || "",
-                            scheduled_date: paper.scheduled_date,
-                            estimated_time: paper.estimated_time,
-                            repeat: paper.repeat,
-                            in_reading_list: paper.in_reading_list,
-                            category: paper.category_id ? {
-                              id: paper.category_id,
-                              name: paper.category || "",
-                              color: paper.category_color
-                            } : undefined
+                          paper={transformPaper(paper, readingList)}
+                          onAddToList={async () => {
+                            const result = await addToReadingList(paper.id);
+                            if (!result.error) {
+                              setReadingList(prev => [...prev, result.data!]);
+                            }
                           }}
-                          onSchedule={(date, time, repeat) => {}}
                           onDelete={() => handleDeletePaper(paper)}
                           isLoading={isLoading}
-                          context="recent"
-                          showAddToListButton={false}
-                          variant="compact"
+                          context="main"
+                          showScheduleButton={!readingList.some(item => item.paper_id === paper.id)}
+                          showAddToListButton={!readingList.some(item => item.paper_id === paper.id)}
+                          variant="default"
                         />
                       </motion.div>
                     ))}

@@ -1,37 +1,23 @@
 import { NextResponse } from "next/server";
-import { storeDiscoveredPapers } from "@/lib/supabase/db";
-import { downloadAndUploadPDF } from "@/lib/supabase/storage";
 import { Paper } from "@/types/paper";
-import crypto from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
+import crypto from "crypto";
 
 const DATA_ENGINE_URL = process.env.NEXT_PUBLIC_DATA_ENGINE_URL || 'http://localhost:8080';
 
-async function indexPaperInRAG(paperId: string, pdfUrl: string) {
-  try {
-    const ragResponse = await fetch(`${process.env.NEXT_PUBLIC_RAG_API_URL}/papers/${paperId}/index-pdf`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        pdf_url: pdfUrl
-      })
-    });
-
-    if (!ragResponse.ok) {
-      const error = await ragResponse.text();
-      console.error('Failed to index paper in RAG service:', error);
-    }
-  } catch (ragError) {
-    console.error('Error indexing paper in RAG:', ragError);
-  }
+interface ReadingListItem {
+  paper_id: string;
+  arxiv_id: string;
+  scheduled_date?: string;
+  estimated_time?: number;
+  repeat?: "daily" | "weekly" | "monthly" | "none";
+  status?: "unread" | "in_progress" | "completed";
 }
 
 export async function POST(request: Request) {
   try {
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const supabase = createClient(cookieStore);
     
     // Get the current user
@@ -62,50 +48,40 @@ export async function POST(request: Request) {
 
     const papers = await response.json() as Paper[];
     
-    // Store in Supabase with UUID and download PDFs
-    const papersToStore = await Promise.all(papers.map(async paper => {
-      const newId = crypto.randomUUID();
-      
-      // Download and store PDF in Supabase
-      let supabaseUrl;
-      try {
-        supabaseUrl = await downloadAndUploadPDF(paper.url, user.id, newId);
-      } catch (error) {
-        console.error('Failed to download/upload PDF:', error);
-        supabaseUrl = paper.url; // Fallback to original URL if download fails
-      }
+    // Get user's reading list to check which papers are already added
+    const { data: readingList } = await supabase
+      .from('reading_list')
+      .select('paper_id, arxiv_id, scheduled_date, estimated_time, repeat, status') as { data: ReadingListItem[] | null };
 
+    // Create a map using arxiv_id for lookup
+    const readingListMap = new Map(
+      (readingList || []).map(item => [item.arxiv_id, item])
+    );
+    
+    // Assign IDs and check reading list status
+    const papersWithIds = papers.map(paper => {
+      const arxivId = paper.id; // Store the original ArXiv ID
+      const readingListItem = readingListMap.get(arxivId);
+      
       return {
         ...paper,
-        id: newId,
-        arxiv_id: paper.id,
-        url: supabaseUrl,
+        id: readingListItem?.paper_id || crypto.randomUUID(), // Use existing UUID if in reading list
+        arxiv_id: arxivId,
         source: 'search',
         created_at: new Date().toISOString(),
+        in_reading_list: !!readingListItem,
+        scheduled_date: readingListItem?.scheduled_date,
+        estimated_time: readingListItem?.estimated_time,
+        repeat: readingListItem?.repeat,
+        status: readingListItem?.status || 'unread',
         metadata: { 
           institution: paper.institution,
-          query: query,
-          original_url: paper.url // Store original URL in metadata
+          query: query
         }
       };
-    }));
+    });
 
-    const { error: storeError } = await storeDiscoveredPapers(papersToStore);
-    if (storeError) {
-      console.error('Failed to store papers:', storeError);
-    }
-
-    // Index papers in RAG using UUID and proxy URL
-    console.log('Starting RAG indexing for papers:', papersToStore.map(p => ({ id: p.id })));
-    
-    const origin = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001';
-    await Promise.all(
-      papersToStore.map(paper => 
-        indexPaperInRAG(paper.id, paper.url)
-      )
-    );
-
-    return NextResponse.json({ papers: papersToStore, total: papers.length });
+    return NextResponse.json({ papers: papersWithIds, total: papers.length });
   } catch (error) {
     console.error("Search error:", error);
     return NextResponse.json(

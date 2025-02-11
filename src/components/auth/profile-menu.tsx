@@ -49,7 +49,7 @@ export function ProfileMenu({ user }: ProfileMenuProps) {
           <span className="sr-only">Open user menu</span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-48 bg-[#1c1c1c] border-[#2a2a2a] text-white">
+      <DropdownMenuContent align="end" className="w-48 bg-[#030014] border-[#2a2a2a] text-white">
         <DropdownMenuItem
           className="flex items-center text-xs cursor-pointer hover:bg-[#2a2a2a]"
           onClick={() => router.push("/settings")}

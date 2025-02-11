@@ -23,4 +23,16 @@ export interface Paper {
   in_reading_list?: boolean;
   status?: 'unread' | 'in_progress' | 'completed';
   user_id?: string;
+}
+
+export interface Annotation {
+  id: string;
+  paper_id: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+  user_id: string;
+  page?: number;
+  color?: string;
+  type?: 'highlight' | 'note' | 'comment';
 } 

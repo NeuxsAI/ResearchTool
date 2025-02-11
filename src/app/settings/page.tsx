@@ -97,24 +97,24 @@ export default function SettingsPage() {
           {/* Profile Section */}
           <section className="space-y-6">
             <div className="flex items-center justify-between">
-              <h2 className="text-zinc-400 text-sm font-medium">Profile</h2>
+              <h2 className="text-[#4a5578] text-sm font-medium">Profile</h2>
             </div>
             
             <form onSubmit={handleUpdateProfile} className="space-y-4">
               <div className="space-y-3">
-                <Label htmlFor="email" className="text-xs font-medium text-zinc-500">
+                <Label htmlFor="email" className="text-xs font-medium text-[#4a5578]">
                   Email
                 </Label>
                 <Input
                   id="email"
                   value={user?.email || ""}
                   disabled
-                  className="h-9 text-sm bg-zinc-900/50 border-zinc-800 text-zinc-400"
+                  className="h-9 text-sm bg-[#1a1f2e] border-[#2a3142] text-[#4a5578]"
                 />
               </div>
               
               <div className="space-y-3">
-                <Label htmlFor="fullName" className="text-xs font-medium text-zinc-500">
+                <Label htmlFor="fullName" className="text-xs font-medium text-[#4a5578]">
                   Full Name
                 </Label>
                 <Input
@@ -122,7 +122,7 @@ export default function SettingsPage() {
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   placeholder="Enter your full name"
-                  className="h-9 text-sm bg-zinc-900/50 border-zinc-800 text-zinc-200 placeholder:text-zinc-600"
+                  className="h-9 text-sm bg-[#1a1f2e] border-[#2a3142] text-white placeholder:text-[#4a5578]"
                 />
               </div>
 
@@ -130,11 +130,11 @@ export default function SettingsPage() {
                 <Button
                   type="submit"
                   disabled={isSaving}
-                  className="h-9 px-4 text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-200"
+                  className="h-9 px-4 text-xs font-medium bg-[#1a1f2e] hover:bg-[#2a3142] text-white"
                 >
                   {isSaving ? (
                     <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 border-t-2 border-zinc-400 rounded-full animate-spin" />
+                      <div className="w-3 h-3 border-t-2 border-[#4a5578] rounded-full animate-spin" />
                       <span>Saving...</span>
                     </div>
                   ) : (
@@ -146,18 +146,18 @@ export default function SettingsPage() {
           </section>
 
           {/* Preferences Section */}
-          <section className="space-y-6 pt-6 border-t border-zinc-800">
+          <section className="space-y-6 pt-6 border-t border-[#1a1f2e]">
             <div className="flex items-center justify-between">
-              <h2 className="text-zinc-400 text-sm font-medium">Preferences</h2>
+              <h2 className="text-[#4a5578] text-sm font-medium">Preferences</h2>
             </div>
             
             <div className="space-y-3">
-              <Label htmlFor="theme" className="text-xs font-medium text-zinc-500">
+              <Label htmlFor="theme" className="text-xs font-medium text-[#4a5578]">
                 Theme
               </Label>
               <select
                 id="theme"
-                className="w-full h-9 text-sm bg-zinc-900/50 border-zinc-800 rounded-md text-zinc-200 px-3 disable"
+                className="w-full h-9 text-sm bg-[#1a1f2e] border-[#2a3142] rounded-md text-white px-3 disable"
                 disabled
                 defaultValue="dark"
               >
@@ -169,15 +169,15 @@ export default function SettingsPage() {
           </section>
 
           {/* Danger Zone */}
-          <section className="space-y-6 pt-6 border-t border-zinc-800">
+          <section className="space-y-6 pt-6 border-t border-[#1a1f2e]">
             <div className="flex items-center justify-between">
-              <h2 className="text-zinc-400 text-sm font-medium">Danger Zone</h2>
+              <h2 className="text-[#4a5578] text-sm font-medium">Danger Zone</h2>
             </div>
             
-            <div className="flex items-center justify-between p-4 bg-zinc-900/50 border border-red-900/20 rounded-lg">
+            <div className="flex items-center justify-between p-4 bg-[#1a1f2e] border border-red-900/20 rounded-lg">
               <div className="space-y-1">
-                <h3 className="text-sm font-medium text-zinc-200">Delete Account</h3>
-                <p className="text-xs text-zinc-500">
+                <h3 className="text-sm font-medium text-white">Delete Account</h3>
+                <p className="text-xs text-[#4a5578]">
                   Permanently remove your account and all its data
                 </p>
               </div>

@@ -53,7 +53,7 @@ export function Testimonials() {
                 <div className="flex items-center gap-4 mb-4">
                   <Avatar>
                     <AvatarImage src={testimonial.avatar} />
-                    <AvatarFallback className="bg-[#1c1c1c] text-white">
+                    <AvatarFallback className="bg-[#030014] text-white">
                       {testimonial.name.split(' ').map(n => n[0]).join('')}
                     </AvatarFallback>
                   </Avatar>

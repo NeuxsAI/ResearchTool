@@ -83,7 +83,7 @@ export function AddDiscoveryPaperDialog({ open, onOpenChange, paper, onPaperAdde
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] bg-[#1c1c1c] border-[#2a2a2a]">
+      <DialogContent className="sm:max-w-[600px] bg-[#030014] border-[#2a2a2a]">
         {isLoading && <LoadingOverlay message="Adding paper to your library..." />}
         <form onSubmit={handleSubmit}>
           <DialogHeader>
@@ -151,7 +151,7 @@ export function AddDiscoveryPaperDialog({ open, onOpenChange, paper, onPaperAdde
             <Button 
               type="submit"
               disabled={isLoading}
-              className="h-7 px-3 mt-5 text-[11px] bg-[#2a2a2a] hover:bg-[#333] text-white"
+              className="h-7 px-3 mt-5 text-[11px] bg-[#1a1f2e] hover:bg-[#2a3142] text-white"
             >
               Add to Library
             </Button>

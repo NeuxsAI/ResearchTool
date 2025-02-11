@@ -4,23 +4,15 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { FileText, MessageSquare } from "lucide-react";
-import { getPaperById, updatePaper } from "@/lib/supabase/db";
+import { getPaperById, updatePaper, getReadingList } from "@/lib/supabase/db";
 import { MainLayout } from "@/components/layout/main-layout";
 import { EditPaperDialog } from "@/components/library/edit-paper-dialog";
 import { PDFViewer } from '@/components/pdf/pdf-viewer';
 import { AnnotationSidebar } from "@/components/annotations/annotation-sidebar";
 import { createAnnotation, getAnnotationsByPaper } from "@/lib/supabase/db";
 import { toast } from "sonner";
-
-interface Paper {
-  id: string;
-  title?: string;
-  authors?: string[];
-  year?: number;
-  category_id?: string;
-  annotations_count?: number;
-  url?: string;
-}
+import { cache, CACHE_KEYS } from "@/lib/cache";
+import type { Paper, Annotation, ReadingListItem } from "@/lib/supabase/types";
 
 interface Selection {
   text: string;
@@ -34,103 +26,127 @@ interface ChatMessage {
   annotationId?: string;
   highlightText?: string;
   isStreaming?: boolean;
+}
+
+interface UIAnnotation {
+  id: string;
+  content: string;
+  highlight_text?: string;
+  created_at: string;
   chat_history?: ChatMessage[];
+}
+
+// Preload function for parallel data fetching
+async function preloadPaperData(paperId: string, refresh = false) {
+  const cachedPaper = !refresh && cache.get<Paper>(`paper_${paperId}`);
+  const cachedAnnotations = !refresh && cache.get<Annotation[]>(`annotations_${paperId}`);
+  const cachedReadingList = !refresh && cache.get<ReadingListItem[]>(CACHE_KEYS.READING_LIST);
+
+  if (cachedPaper && cachedAnnotations && cachedReadingList) {
+    return {
+      paper: cachedPaper,
+      annotations: cachedAnnotations,
+      readingList: cachedReadingList
+    };
+  }
+
+  const [paperResult, annotationsResult, readingListResult] = await Promise.all([
+    getPaperById(paperId),
+    getAnnotationsByPaper(paperId),
+    getReadingList()
+  ]);
+
+  const paper = paperResult.data;
+  const annotations = annotationsResult.data || [];
+  const readingList = readingListResult.data || [];
+
+  if (!refresh && paper) {
+    cache.set(`paper_${paperId}`, paper);
+    cache.set(`annotations_${paperId}`, annotations);
+    cache.set(CACHE_KEYS.READING_LIST, readingList);
+  }
+
+  return { paper, annotations, readingList };
 }
 
 export default function PaperPage() {
   const params = useParams();
+  const paperId = typeof params?.id === 'string' ? params.id : Array.isArray(params?.id) ? params.id[0] : '';
+  
   const [paper, setPaper] = useState<Paper | null>(null);
+  const [annotations, setAnnotations] = useState<Annotation[]>([]);
+  const [readingList, setReadingList] = useState<ReadingListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [isEditPaperOpen, setIsEditPaperOpen] = useState(false);
   const [isAnnotationSidebarOpen, setIsAnnotationSidebarOpen] = useState(false);
-  const [annotations, setAnnotations] = useState<Array<{
-    id: string;
-    content: string;
-    highlight_text?: string;
-    created_at: string;
-    chat_history?: ChatMessage[];
-  }>>([]);
   const [highlightedText, setHighlightedText] = useState<string | undefined>();
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [isChatLoading, setIsChatLoading] = useState(false);
 
-  useEffect(() => {
-    async function loadPaper() {
-      if (!params?.id) return;
-      
-      try {
-        setIsLoading(true);
-        setError(null);
-        
-        const paperId = Array.isArray(params.id) ? params.id[0] : params.id;
-        const { data, error: paperError } = await getPaperById(paperId);
+  // Transform DB annotation to UI annotation
+  const transformAnnotation = (annotation: Annotation): UIAnnotation => ({
+    id: annotation.id,
+    content: annotation.content,
+    highlight_text: annotation.highlight_text,
+    created_at: annotation.created_at,
+    chat_history: annotation.chat_history
+  });
 
-        if (paperError) {
-          console.error("Error loading paper:", paperError);
-          setError("Failed to load paper");
-          return;
-        }
-
-        if (!data) {
-          setError("Paper not found");
-          return;
-        }
-
-        setPaper(data);
-      } catch (error) {
-        console.error("Error loading paper data:", error);
-        setError("Failed to load paper data");
-      } finally {
-        setIsLoading(false);
-      }
-    }
-    loadPaper();
-  }, [params?.id]);
-
-  useEffect(() => {
-    async function loadAnnotations() {
-      if (!paper?.id) return;
-      
-      try {
-        const { data, error } = await getAnnotationsByPaper(paper.id);
-        if (error) throw error;
-        setAnnotations(data || []);
-      } catch (error) {
-        console.error("Error loading annotations:", error);
-        toast.error("Failed to load annotations");
-      }
-    }
-    loadAnnotations();
-  }, [paper?.id]);
-
-  const handleSaveAnnotation = async (content: string, highlightText?: string) => {
-    if (!paper?.id) return;
-
+  const loadData = async (refresh = false) => {
+    if (!paperId) return;
+    
     try {
-      const now = new Date().toISOString();
-      const { data, error } = await createAnnotation({
-        content,
+      setIsLoading(true);
+      const { paper, annotations, readingList } = await preloadPaperData(paperId, refresh);
+      if (paper) {
+        setPaper(paper);
+        setAnnotations(annotations);
+        setReadingList(readingList);
+      }
+    } catch (error) {
+      console.error('Error loading data:', error);
+      toast.error('Failed to load data');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!paperId) return;
+
+    // Try to load from cache first
+    const cachedPaper = cache.get<Paper>(`paper_${paperId}`);
+    const cachedAnnotations = cache.get<Annotation[]>(`annotations_${paperId}`);
+    const cachedReadingList = cache.get<ReadingListItem[]>(CACHE_KEYS.READING_LIST);
+    
+    if (cachedPaper && cachedAnnotations && cachedReadingList) {
+      setPaper(cachedPaper);
+      setAnnotations(cachedAnnotations);
+      setReadingList(cachedReadingList);
+      setIsLoading(false);
+    } else {
+      loadData(false);
+    }
+  }, [paperId]);
+
+  const handleSaveAnnotation = async (content: string, highlightedText?: string) => {
+    if (!paper) return;
+    
+    try {
+      const result = await createAnnotation({
         paper_id: paper.id,
-        highlight_text: highlightText,
-        created_at: now,
-        updated_at: now
+        content,
+        highlight_text: highlightedText
       });
 
-      if (error) {
-        console.error("Full annotation error:", error);
-        throw error;
-      }
+      if (result.error) throw result.error;
+      if (!result.data) throw new Error("No data returned");
 
-      // Reset selection
+      setAnnotations(prev => [...prev, result.data!]);
       setHighlightedText(undefined);
-
-      // Reload annotations
-      const { data: newAnnotations } = await getAnnotationsByPaper(paper.id);
-      setAnnotations(newAnnotations || []);
       toast.success("Annotation saved");
     } catch (error) {
-      console.error("Detailed error:", error);
+      console.error("Error saving annotation:", error);
       toast.error("Failed to save annotation");
     }
   };
@@ -180,50 +196,15 @@ export default function PaperPage() {
     }, 100); // Small delay to ensure sidebar is open
   };
 
-  const handleSaveChat = async () => {
-    try {
-      // Get the first message as title/summary
-      const firstMessage = chatMessages[0];
-      if (!firstMessage) return;
-
-      // Create a new annotation with the chat
-      const { data: annotation, error } = await createAnnotation({
-        paper_id: paper?.id as string,
-        content: firstMessage.content.slice(0, 100) + "...", // First message as summary
-        highlight_text: firstMessage.highlightText,
-        chat_history: chatMessages
-      });
-
-      if (error) throw error;
-
-      // Refresh annotations
-      const { data: updatedAnnotations } = await getAnnotationsByPaper(paper?.id as string);
-      setAnnotations(updatedAnnotations || []);
-
-      // Reset chat messages after successful save
-      setChatMessages([]);
-      
-      toast.success("Chat saved as annotation");
-    } catch (error) {
-      console.error("Error saving chat:", error);
-      toast.error("Failed to save chat");
-    }
-  };
-
-  const handleStartChat = (annotation: typeof annotations[0]) => {
-    // If there's existing chat history, load it
-    if (annotation.chat_history?.length) {
-      setChatMessages(annotation.chat_history);
-    } else {
-      // Start new chat with annotation content as context
-      const initialMessage: ChatMessage = {
-        role: "system",
-        content: `Context: ${annotation.content}${annotation.highlight_text ? `\n\nHighlighted text: ${annotation.highlight_text}` : ""}`,
-        timestamp: new Date().toISOString(),
-        annotationId: annotation.id
-      };
-      setChatMessages([initialMessage]);
-    }
+  const handleStartChat = (annotation: {
+    id: string;
+    content: string;
+    highlight_text?: string;
+    created_at: string;
+    chat_history?: ChatMessage[];
+  }) => {
+    setHighlightedText(annotation.highlight_text);
+    setChatMessages(annotation.chat_history || []);
   };
 
   const handleSendMessage = async (content: string, highlightedText?: string) => {
@@ -332,12 +313,55 @@ export default function PaperPage() {
     }
   };
 
+  const handleSaveChat = async (messages: ChatMessage[]) => {
+    try {
+      // Get the first message as title/summary
+      const firstMessage = messages[0];
+      if (!firstMessage) return;
+
+      // Create a new annotation with the chat
+      const { data: annotation, error } = await createAnnotation({
+        paper_id: paper?.id as string,
+        content: firstMessage.content.slice(0, 100) + "...", // First message as summary
+        highlight_text: firstMessage.highlightText,
+        chat_history: messages
+      });
+
+      if (error) throw error;
+
+      // Refresh annotations
+      const { data: updatedAnnotations } = await getAnnotationsByPaper(paper?.id as string);
+      setAnnotations(updatedAnnotations || []);
+
+      // Reset chat messages after successful save
+      setChatMessages([]);
+      
+      toast.success("Chat saved as annotation");
+    } catch (error) {
+      console.error("Error saving chat:", error);
+      toast.error("Failed to save chat");
+    }
+  };
+
   // Add this new handler
   const handleContainerClick = (e: React.MouseEvent) => {
     // Only clear if clicking the container itself, not a selection
     if (e.target === e.currentTarget) {
       setHighlightedText(undefined);
     }
+  };
+
+  const handleAnnotationSelect = (uiAnnotation: UIAnnotation) => {
+    const annotation = annotations.find(a => a.id === uiAnnotation.id);
+    if (annotation) {
+      setHighlightedText(annotation.highlight_text);
+      setChatMessages(annotation.chat_history || []);
+    }
+  };
+
+  const handleAnnotationDelete = async (annotationId: string) => {
+    const newAnnotations = annotations.filter(a => a.id !== annotationId);
+    setAnnotations(newAnnotations);
   };
 
   if (isLoading) {
@@ -348,12 +372,12 @@ export default function PaperPage() {
     </MainLayout>;
   }
 
-  if (error || !paper) {
+  if (!paper) {
     return <MainLayout>
       <div className="h-full flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-xl font-semibold text-[#eee] mb-2">Paper not found</h1>
-          <p className="text-[#888]">{error || "The paper you're looking for doesn't exist."}</p>
+          <p className="text-[#888]">The paper you're looking for doesn't exist.</p>
         </div>
       </div>
     </MainLayout>;
@@ -378,9 +402,9 @@ export default function PaperPage() {
 
   return (
     <MainLayout>
-      <div className="h-full bg-[#1c1c1c] flex flex-col">
+      <div className="h-full bg-[#030014] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-[#2a2a2a]">
+        <div className="flex items-center justify-between p-4 border-b border-[#1a1f2e]">
           <div className="flex items-center gap-2">
             <h1 className="text-[#eee] text-sm font-medium">{paper.title}</h1>
           </div>
@@ -388,7 +412,7 @@ export default function PaperPage() {
             <Button 
               variant="ghost" 
               size="sm" 
-              className="h-8 bg-[#2a2a2a] hover:bg-[#333] text-white"
+              className="h-8 bg-[#1a1f2e] hover:bg-[#2a3142] text-white"
               onClick={() => setIsEditPaperOpen(true)}
             >
               <FileText className="h-4 w-4 mr-2" />
@@ -397,7 +421,7 @@ export default function PaperPage() {
             <Button 
               variant="ghost" 
               size="sm" 
-              className="h-8 bg-[#2a2a2a] hover:bg-[#333] text-white"
+              className="h-8 bg-[#1a1f2e] hover:bg-[#2a3142] text-white"
               onClick={() => setIsAnnotationSidebarOpen(true)}
             >
               <MessageSquare className="h-4 w-4 mr-2" />
@@ -418,20 +442,20 @@ export default function PaperPage() {
               />
             </div>
           ) : (
-            <div className="h-full flex items-center justify-center text-[#888]">
+            <div className="h-full flex items-center justify-center text-[#4a5578]">
               No PDF available for this paper
             </div>
           )}
           
           <AnnotationSidebar
             open={isAnnotationSidebarOpen}
-            onClose={handleSidebarClose}
+            onClose={() => setIsAnnotationSidebarOpen(false)}
             onSave={handleSaveAnnotation}
             onSendMessage={handleSendMessage}
             onSaveChat={handleSaveChat}
             onStartChat={handleStartChat}
             onClearHighlight={() => setHighlightedText(undefined)}
-            annotations={annotations}
+            annotations={annotations.map(transformAnnotation)}
             highlightedText={highlightedText}
             chatMessages={chatMessages}
             isChatLoading={isChatLoading}

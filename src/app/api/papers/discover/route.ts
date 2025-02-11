@@ -1,36 +1,40 @@
 import { NextResponse } from "next/server";
-import { storeDiscoveredPapers } from "@/lib/supabase/db";
 import { Paper } from "@/types/paper";
-import crypto from "crypto";
+import { createClient } from "@/lib/supabase/server";
+import { cookies } from "next/headers";
+import { cache, CACHE_KEYS } from '@/lib/cache';
 
 const DATA_ENGINE_URL = process.env.NEXT_PUBLIC_DATA_ENGINE_URL || 'http://localhost:8080';
 
-async function indexPaperInRAG(paperId: string, pdfUrl: string) {
-  try {
-    const ragResponse = await fetch(`${process.env.NEXT_PUBLIC_RAG_API_URL}/papers/${paperId}/index-pdf`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        pdf_url: pdfUrl
-      })
-    });
-
-    if (!ragResponse.ok) {
-      const error = await ragResponse.text();
-      console.error('Failed to index paper in RAG service:', error);
-    }
-  } catch (ragError) {
-    console.error('Error indexing paper in RAG:', ragError);
-  }
-}
-
 export async function GET(request: Request) {
   try {
+    const cookieStore = await cookies();
+    const supabase = createClient(cookieStore);
+    
+    // Get the current user
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      throw new Error('Not authenticated');
+    }
+
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get("limit") || "10");
     const refresh = searchParams.get("refresh") === "true";
+
+    // Check cache first if not refreshing
+    if (!refresh) {
+      const { data: cachedPapers } = await supabase
+        .from('discovered_papers')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('source', 'recommendations')
+        .order('discovered_at', { ascending: false })
+        .limit(limit);
+
+      if (cachedPapers && cachedPapers.length > 0) {
+        return NextResponse.json({ papers: cachedPapers, total: cachedPapers.length });
+      }
+    }
 
     const params = new URLSearchParams({
       max_results: limit.toString(),
@@ -49,37 +53,40 @@ export async function GET(request: Request) {
     }
 
     const papers = await response.json() as Paper[];
-    
-    // Store in Supabase with UUID
-    const papersToStore = papers.map(paper => ({
-      ...paper,
-      id: crypto.randomUUID(), // Generate UUID instead of using ArXiv ID
-      arxiv_id: paper.id, // Store original ArXiv ID
+
+    // Store papers in discovered_papers table
+    const discoveredPapers = papers.map(paper => ({
+      id: crypto.randomUUID(),
+      title: paper.title,
+      authors: paper.authors,
+      year: paper.year,
+      abstract: paper.abstract || '',
+      url: paper.url,
+      citations: paper.citations || 0,
+      impact: paper.impact || 'low',
+      topics: paper.topics || [],
+      arxiv_id: paper.id,
+      user_id: user.id,
       source: 'recommendations',
-      created_at: new Date().toISOString(),
-      metadata: { 
+      discovered_at: new Date().toISOString(),
+      metadata: {
         institution: paper.institution,
         discovery_type: 'recommended'
       }
     }));
 
-    const { error: storeError } = await storeDiscoveredPapers(papersToStore);
+    const { error: storeError } = await supabase
+      .from('discovered_papers')
+      .upsert(discoveredPapers, {
+        onConflict: 'arxiv_id,user_id',
+        ignoreDuplicates: false
+      });
+
     if (storeError) {
-      console.error('Failed to store papers:', storeError);
+      console.error('Failed to store discovered papers:', storeError);
     }
 
-    // Index papers in RAG using UUID and proxy URL
-    console.log('Starting RAG indexing for papers:', papersToStore.map(p => ({ id: p.id })));
-    console.log('RAG API URL:', process.env.NEXT_PUBLIC_RAG_API_URL);
-
-    const origin = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001';
-    await Promise.all(
-      papersToStore.map(paper => 
-        indexPaperInRAG(paper.id, `${origin}/api/papers/${paper.id}/pdf`)
-      )
-    );
-
-    return NextResponse.json({ papers: papersToStore, total: papers.length });
+    return NextResponse.json({ papers: discoveredPapers, total: papers.length });
   } catch (error) {
     console.error("Failed to fetch recommended papers:", error);
     return NextResponse.json(

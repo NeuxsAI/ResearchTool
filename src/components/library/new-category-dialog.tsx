@@ -66,7 +66,7 @@ export function NewCategoryDialog() {
           New category
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px] bg-[#1c1c1c] border-[#2a2a2a]">
+      <DialogContent className="sm:max-w-[425px] bg-[#030014] border-[#2a2a2a]">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle className="text-white">New Category</DialogTitle>
@@ -103,7 +103,7 @@ export function NewCategoryDialog() {
             <Button 
               type="submit"
               disabled={isLoading || !name}
-              className="h-7 px-3 text-[11px] bg-[#2a2a2a] hover:bg-[#333] text-white"
+              className="h-7 px-3 text-[11px] bg-[#1a1f2e] hover:bg-[#2a3142] text-white"
             >
               Create category
             </Button>

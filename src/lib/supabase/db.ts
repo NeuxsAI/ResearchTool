@@ -195,69 +195,60 @@ export async function addPaperFromDiscovery(
     citations?: number;
     impact?: 'high' | 'low';
     topics?: string[];
+    arxiv_id?: string;
   },
   categoryId?: string
 ): Promise<DbResult<Paper>> {
   const supabase = createBrowserClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { data: null, error: new Error('User not authenticated') };
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) {
+    return { data: null, error: new Error('Not authenticated') };
+  }
 
   try {
-    // Generate a new UUID for the paper
-    const { data: { id: paperId } } = await supabase.rpc('generate_uuid');
-
-    // Create paper with discovery data
-    const paperData = {
-      id: paperId,
-      title: paper.title,
-      authors: paper.authors,
-      year: paper.year,
-      abstract: paper.abstract || '',
-      url: paper.url,
-      citations: paper.citations || 0,
-      impact: paper.impact || 'low',
-      topics: paper.topics || [],
-      category_id: categoryId,
-      user_id: user.id,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-
-    // First create the paper
-    const { data: createdPaper, error: paperError } = await supabase
-      .from('papers')
-      .insert(paperData)
-      .select()
-      .single();
-
-    if (paperError) {
-      console.error('Failed to create paper:', paperError);
-      return { data: null, error: new Error(paperError.message) };
+    // Create form data
+    const formData = new FormData();
+    formData.append('title', paper.title);
+    formData.append('authors', JSON.stringify(paper.authors));
+    formData.append('year', paper.year.toString());
+    formData.append('abstract', paper.abstract || '');
+    formData.append('url', paper.url || '');
+    if (categoryId) {
+      formData.append('categoryId', categoryId);
+    }
+    if (paper.arxiv_id) {
+      formData.append('arxiv_id', paper.arxiv_id);
     }
 
-    if (!createdPaper) {
-      return { data: null, error: new Error('Failed to create paper: No data returned') };
+    // Submit to API route with proper headers and credentials
+    const response = await fetch('/api/papers', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`
+      },
+      body: formData,
+      credentials: 'include'
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('Failed to create paper:', errorData);
+      throw new Error(errorData.error || 'Failed to create paper');
     }
 
-    // Then add it to reading list
-    const { error: readingListError } = await supabase
-      .from('reading_list')
-      .insert({
-        paper_id: createdPaper.id,
-        user_id: user.id,
-        added_at: new Date().toISOString(),
-      });
-
-    if (readingListError) {
-      console.error('Failed to add paper to reading list:', readingListError);
-      // Even if reading list fails, we return the created paper
-      return { data: createdPaper, error: new Error('Paper created but failed to add to reading list: ' + readingListError.message) };
-    }
-
-    return { data: createdPaper, error: null };
+    const data = await response.json();
+    
+    // Clear cache to force refresh
+    cache.delete(CACHE_KEYS.PAPERS);
+    cache.delete(CACHE_KEYS.READING_LIST);
+    
+    return { data: data.paper, error: null };
   } catch (error) {
-    console.error('Error in addPaperFromDiscovery:', error);
-    return { data: null, error: error instanceof Error ? error : new Error('Unknown error occurred') };
+    console.error('Error adding paper:', error);
+    return { 
+      data: null, 
+      error: error instanceof Error ? error : new Error('Failed to add paper')
+    };
   }
 }
 
@@ -280,10 +271,14 @@ export async function updatePaper(
 
 export async function deletePaper(id: string, token?: string): Promise<DbResult<Paper>> {
   const supabase = createBrowserClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { data: null, error: new Error('Not authenticated') }
+  
   return await supabase
     .from('papers')
     .delete()
     .eq('id', id)
+    .eq('user_id', user.id)
     .select()
     .single()
 }
@@ -474,84 +469,99 @@ export const getReadingList = async (): Promise<DbArrayResult<ReadingListItem>> 
   return result
 }
 
-export async function addToReadingList(paperId: string, paperData?: Partial<Paper>): Promise<DbResult<ReadingListItem>> {
+export async function addToReadingList(
+  paperId: string,
+  paperData?: Partial<Paper>
+): Promise<DbResult<ReadingListItem>> {
   const supabase = createBrowserClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { data: null, error: new Error('Not authenticated') };
+  if (!user) return { data: null, error: new Error('User not authenticated') };
 
-  // First check if paper exists
-  const { data: existingPaper, error: paperCheckError } = await supabase
-    .from('papers')
-    .select()
-    .eq('id', paperId)
-    .maybeSingle();
+  try {
+    // First check if we need to create the paper
+    let paper;
+    if (paperData) {
+      // Check if paper already exists by arxiv_id
+      const { data: existingPaper } = await supabase
+        .from('papers')
+        .select('*')
+        .eq('arxiv_id', paperData.arxiv_id)
+        .eq('user_id', user.id)
+        .single();
 
-  if (paperCheckError) {
-    console.error('Error checking paper:', paperCheckError);
-    return { data: null, error: paperCheckError };
-  }
+      if (existingPaper) {
+        paper = existingPaper;
+      } else {
+        // Create new paper
+        const { data: newPaper, error: paperError } = await supabase
+          .from('papers')
+          .insert({
+            ...paperData,
+            user_id: user.id,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .select()
+          .single();
 
-  // If paper doesn't exist and we have paper data, create it
-  if (!existingPaper && paperData) {
-    const { error: createPaperError } = await supabase
-      .from('papers')
-      .insert({
-        id: paperId,
-        title: paperData.title,
-        authors: paperData.authors,
-        year: paperData.year,
-        abstract: paperData.abstract,
-        url: paperData.url,
-        user_id: user.id,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      });
+        if (paperError) throw paperError;
+        paper = newPaper;
+      }
+    } else {
+      // Get existing paper
+      const { data: existingPaper, error: paperError } = await supabase
+        .from('papers')
+        .select('*')
+        .eq('id', paperId)
+        .single();
 
-    if (createPaperError) {
-      console.error('Error creating paper:', createPaperError);
-      return { data: null, error: createPaperError };
+      if (paperError) throw paperError;
+      paper = existingPaper;
     }
+
+    if (!paper) {
+      throw new Error('Paper not found and no data provided to create it');
+    }
+
+    // Check if paper is already in reading list
+    const { data: existingItem } = await supabase
+      .from('reading_list')
+      .select('*')
+      .eq('paper_id', paper.id)
+      .eq('user_id', user.id)
+      .single();
+
+    if (existingItem) {
+      return { data: existingItem, error: null };
+    }
+
+    // Add to reading list
+    const { data: readingListItem, error: readingListError } = await supabase
+      .from('reading_list')
+      .insert({
+        paper_id: paper.id,
+        arxiv_id: paper.arxiv_id,
+        user_id: user.id,
+        added_at: new Date().toISOString(),
+        status: 'unread'
+      })
+      .select()
+      .single();
+
+    if (readingListError) throw readingListError;
+
+    // Clear cache to force refresh
+    cache.delete(CACHE_KEYS.PAPERS);
+    cache.delete(CACHE_KEYS.READING_LIST);
+
+    return { data: readingListItem, error: null };
+  } catch (error) {
+    console.error('Error in addToReadingList:', error);
+    return { 
+      data: null, 
+      error: error instanceof Error ? error : new Error('Failed to add to reading list') 
+    };
   }
-
-  // Check if paper is already in reading list
-  const { data: existingItem, error: checkError } = await supabase
-    .from('reading_list')
-    .select()
-    .eq('paper_id', paperId)
-    .eq('user_id', user.id)
-    .maybeSingle();
-
-  if (checkError) {
-    console.error('Error checking reading list:', checkError);
-    return { data: null, error: checkError };
-  }
-
-  if (existingItem) {
-    return { data: existingItem, error: null };
-  }
-
-  // Add to reading list
-  const { data, error } = await supabase
-    .from('reading_list')
-    .insert({
-      paper_id: paperId,
-      user_id: user.id,
-      added_at: new Date().toISOString()
-    })
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Error adding to reading list:', error);
-    return { data: null, error };
-  }
-
-  if (!error) {
-    cache.invalidate(CACHE_KEYS.READING_LIST);
-    cache.invalidate(CACHE_KEYS.PAPERS);
-  }
-
-  return { data, error: null };
 }
 
 export async function removeFromReadingList(id: string): Promise<DbResult<ReadingListItem>> {
