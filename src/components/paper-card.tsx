@@ -143,10 +143,10 @@ export function PaperCard({
     >
       <Card 
         className={cn(
-          "bg-[#0A192F] overflow-hidden cursor-pointer transition-all duration-200 group relative",
+          "bg-[#0A192F] overflow-hidden transition-all duration-200 group relative",
           "hover:shadow-lg border-[#1E3A8A]/30",
           variant === 'compact' 
-            ? 'p-3 flex flex-col min-h-[100px] max-h-[120px]' 
+            ? 'p-4 flex flex-col gap-1.5 h-[180px]' 
             : 'p-4 flex flex-col min-h-[160px]',
           !disableNavigation && "cursor-pointer",
           className || ''
@@ -154,13 +154,12 @@ export function PaperCard({
         onClick={handleCardClick}
       >
         {/* Top metadata row */}
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-1.5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
             <Badge 
               variant="secondary" 
               className={cn(
-                "px-1.5 py-0.5 font-medium rounded-md",
-                variant === 'compact' ? 'text-[9px]' : 'text-[10px]',
+                "px-1.5 py-0.5 font-medium rounded-md text-[10px]",
                 paper.impact === "high"
                   ? "bg-violet-500/10 text-violet-500 hover:bg-violet-500/20"
                   : "bg-blue-500/10 text-blue-500 hover:bg-blue-500/20"
@@ -168,20 +167,6 @@ export function PaperCard({
             >
               {paper.impact === "high" ? "High Impact" : "Low Impact"}
             </Badge>
-            <div className="flex items-center gap-1.5">
-              <span className={cn(
-                "text-[#4a5578]",
-                variant === 'compact' ? 'text-[9px]' : 'text-[10px]'
-              )}>{paper.year}</span>
-              <span className={cn(
-                "text-[#4a5578]",
-                variant === 'compact' ? 'text-[9px]' : 'text-[10px]'
-              )}>•</span>
-              <span className={cn(
-                "text-[#4a5578]",
-                variant === 'compact' ? 'text-[9px]' : 'text-[10px]'
-              )}>{paper.citations} citations</span>
-            </div>
           </div>
 
           <DropdownMenu>
@@ -226,29 +211,48 @@ export function PaperCard({
         </div>
 
         {/* Main content */}
-        <div className="flex-1 flex flex-col min-h-0">
+        <div className={cn(
+          "flex-1 flex flex-col min-h-0",
+          variant === 'compact' && "gap-1.5"
+        )}>
           <h3 className={cn(
-            "font-medium leading-tight transition-colors mb-1",
+            "font-medium leading-snug transition-colors overflow-hidden",
             variant === 'compact' 
-              ? 'text-xs line-clamp-2 text-[#E2E8F0] group-hover:text-[#38BDF8]' 
-              : 'text-sm line-clamp-2 text-[#F8FAFC] group-hover:text-[#60A5FA]'
+              ? 'text-xs text-[#E2E8F0] group-hover:text-[#38BDF8] min-h-[32px] text-ellipsis' 
+              : 'text-sm text-[#F8FAFC] group-hover:text-[#60A5FA] mb-1'
           )}>
-            {paper.title}
+            <div className="line-clamp-2">
+              {paper.title}
+            </div>
           </h3>
           
-          <p className={cn(
-            "mb-2",
-            variant === 'compact' 
-              ? 'text-[9px] line-clamp-1 text-[#4a5578]' 
-              : 'text-xs line-clamp-1 text-[#4a5578]'
-          )}>
-            {paper.authors.join(", ")}
-          </p>
-
-          {paper.abstract && variant !== 'compact' && (
-            <p className="text-xs text-[#4a5578] line-clamp-2 leading-relaxed mb-3">
-              {paper.abstract}
-            </p>
+          {variant === 'compact' ? (
+            <>
+              <div className="flex items-center justify-between text-[10px] text-[#4a5578]">
+                <span className="line-clamp-1 flex-1">{paper.authors.join(", ")}</span>
+                <span className="flex items-center gap-1.5 whitespace-nowrap">
+                  <span>{paper.year}</span>
+                  <span>•</span>
+                  <span>{paper.citations} citations</span>
+                </span>
+              </div>
+              {paper.abstract && (
+                <p className="text-[10px] text-[#4a5578] line-clamp-3 leading-relaxed">
+                  {paper.abstract}
+                </p>
+              )}
+            </>
+          ) : (
+            <>
+              <p className="text-xs line-clamp-1 text-[#4a5578] mb-2">
+                {paper.authors.join(", ")}
+              </p>
+              {paper.abstract && (
+                <p className="text-xs text-[#4a5578] line-clamp-2 leading-relaxed mb-3">
+                  {paper.abstract}
+                </p>
+              )}
+            </>
           )}
           
           {variant !== 'compact' && paper.topics.length > 0 && (

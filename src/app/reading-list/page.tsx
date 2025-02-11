@@ -516,29 +516,7 @@ export default function ReadingListPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between">
-              <div className="text-[11px] text-[#4a5578]">
-                {papers.length} papers
-              </div>
-              <div className="flex items-center gap-2">
-                <Tabs defaultValue="grid">
-                  <TabsList className="h-7 bg-[#1a1f2e] p-0.5 gap-0.5">
-                    <TabsTrigger 
-                      value="grid" 
-                      className="h-6 w-6 p-0 data-[state=active]:bg-[#2a3142]"
-                    >
-                      <LayoutGrid className="h-3.5 w-3.5" />
-                    </TabsTrigger>
-                    <TabsTrigger 
-                      value="list" 
-                      className="h-6 w-6 p-0 data-[state=active]:bg-[#2a3142]"
-                    >
-                      <List className="h-3.5 w-3.5" />
-                    </TabsTrigger>
-                  </TabsList>
-                </Tabs>
-              </div>
-            </div>
+
           </div>
         </div>
 
@@ -695,300 +673,258 @@ export default function ReadingListPage() {
           </div>
 
           {/* Right Panel - Paper List */}
-          <div className="flex-1 min-w-0 p-3 overflow-hidden">
+          <div className="flex-1 min-w-0 overflow-hidden">
             <Tabs defaultValue="scheduled" className="h-full flex flex-col">
-              <TabsList className="flex-none h-7 bg-[#1a1f2e] p-0.5 gap-0.5">
-                <TabsTrigger value="scheduled" className="h-6 text-[11px] data-[state=active]:bg-[#2a3142]">
-                  Scheduled
-                </TabsTrigger>
-                <TabsTrigger value="unscheduled" className="h-6 text-[11px] data-[state=active]:bg-[#2a3142]">
-                  Unscheduled
-                </TabsTrigger>
-              </TabsList>
+              <div className="flex items-center justify-between p-3 border-b border-[#1a1f2e]">
+                <TabsList className="h-7 bg-[#1a1f2e] p-0.5 gap-0.5">
+                  <TabsTrigger value="scheduled" className="h-6 px-3 text-[11px] data-[state=active]:bg-[#2a3142]">
+                    Scheduled
+                  </TabsTrigger>
+                  <TabsTrigger value="unscheduled" className="h-6 px-3 text-[11px] data-[state=active]:bg-[#2a3142]">
+                    Unscheduled
+                  </TabsTrigger>
+                </TabsList>
 
-              <TabsContent value="scheduled" className="flex-1 min-h-0 mt-3">
-                <div className="h-full overflow-y-auto">
-                  <div className="flex items-center justify-end gap-2 mb-3">
-                    <div className="bg-[#1a1f2e] rounded-md p-0.5 flex gap-0.5">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setScheduledViewMode('calendar')}
-                        className={cn(
-                          "h-7 px-2.5 text-[11px]",
-                          scheduledViewMode === 'calendar' ? "bg-[#2a3142] text-white" : "text-[#4a5578] hover:text-white hover:bg-[#2a3142]"
-                        )}
-                      >
-                        <CalendarIcon className="h-3.5 w-3.5 mr-1.5" />
-                        Calendar
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setScheduledViewMode('grid')}
-                        className={cn(
-                          "h-7 px-2.5 text-[11px]",
-                          scheduledViewMode === 'grid' ? "bg-[#2a3142] text-white" : "text-[#4a5578] hover:text-white hover:bg-[#2a3142]"
-                        )}
-                      >
-                        <Grid2x2 className="h-3.5 w-3.5 mr-1.5" />
-                        Grid
-                      </Button>
+                <div className="bg-[#1a1f2e] rounded-md p-0.5 flex gap-0.5">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setScheduledViewMode('calendar')}
+                    className={cn(
+                      "h-7 px-2.5 text-[11px]",
+                      scheduledViewMode === 'calendar' ? "bg-[#2a3142] text-white" : "text-[#4a5578] hover:text-white hover:bg-[#2a3142]"
+                    )}
+                  >
+                    <CalendarIcon className="h-3.5 w-3.5 mr-1.5" />
+                    Calendar
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setScheduledViewMode('grid')}
+                    className={cn(
+                      "h-7 px-2.5 text-[11px]",
+                      scheduledViewMode === 'grid' ? "bg-[#2a3142] text-white" : "text-[#4a5578] hover:text-white hover:bg-[#2a3142]"
+                    )}
+                  >
+                    <Grid2x2 className="h-3.5 w-3.5 mr-1.5" />
+                    Grid
+                  </Button>
+                </div>
+              </div>
+
+              <TabsContent value="scheduled" className="flex-1 overflow-y-auto p-3">
+                {scheduledViewMode === 'grid' ? (
+                  <div className="space-y-2">
+                    {/* Grid view content */}
+                    {papers.filter(p => p.scheduled_date).map((paper) => (
+                      <motion.div key={paper.id} variants={itemVariants}>
+                        <PaperCard
+                          paper={paper}
+                          onSchedule={(date, estimatedTime, repeat) => 
+                            handleSchedulePaper(paper, date, estimatedTime, repeat)
+                          }
+                          onDelete={() => handleDeletePaper(paper)}
+                          isLoading={isLoading}
+                          context="reading-list"
+                          variant="compact"
+                        />
+                      </motion.div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="h-[calc(100vh-12rem)] overflow-y-auto">
+                    <div className="bg-[#030014] rounded-lg">
+                      {/* Calendar Header */}
+                      <div className="flex items-center justify-between p-4 border-b border-[#1a1f2e]">
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              const prev = new Date(selectedDate);
+                              prev.setMonth(prev.getMonth() - 1);
+                              setSelectedDate(prev);
+                            }}
+                            className="h-7 w-7 p-0 hover:bg-[#2a3142]"
+                          >
+                            <ChevronDown className="h-4 w-4 rotate-90 text-[#4a5578]" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              const next = new Date(selectedDate);
+                              next.setMonth(next.getMonth() + 1);
+                              setSelectedDate(next);
+                            }}
+                            className="h-7 w-7 p-0 hover:bg-[#2a3142]"
+                          >
+                            <ChevronDown className="h-4 w-4 -rotate-90 text-[#4a5578]" />
+                          </Button>
+                          <h3 className="text-sm font-medium text-white">
+                            {format(selectedDate, 'MMMM yyyy')}
+                          </h3>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setSelectedDate(new Date())}
+                          className="h-7 px-2.5 text-[11px] hover:bg-[#2a3142] text-[#4a5578]"
+                        >
+                          Today
+                        </Button>
+                      </div>
+
+                      {/* Calendar Grid */}
+                      <div className="grid grid-cols-7 auto-rows-[80px]">
+                        {Array.from({ length: 42 }, (_, i) => {
+                          const date = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+                          date.setDate(1 - date.getDay() + i);
+                          
+                          const isCurrentMonth = date.getMonth() === selectedDate.getMonth();
+                          const isToday = format(date, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
+                          const isSelected = format(date, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd');
+                          
+                          const scheduledPapers = papers.filter(p => {
+                            if (!p.scheduled_date) return false;
+                            const paperDate = new Date(p.scheduled_date);
+                            return format(paperDate, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd');
+                          });
+
+                          return (
+                            <div
+                              key={i}
+                              onClick={() => handleDateSelect(date)}
+                              className={cn(
+                                "p-1 border-r border-b border-[#1a1f2e] last:border-r-0 relative cursor-pointer hover:bg-[#2a3142]/50 transition-colors",
+                                !isCurrentMonth && "bg-[#1a1f2e]",
+                                isSelected && "bg-[#2a3142]"
+                              )}
+                            >
+                              <div className={cn(
+                                "text-[11px] font-medium mb-1 rounded-full w-5 h-5 flex items-center justify-center",
+                                isToday ? "bg-violet-500 text-white" : "text-[#4a5578]",
+                                !isCurrentMonth && "text-[#4a5578]"
+                              )}>
+                                {date.getDate()}
+                              </div>
+                              <div className="space-y-0.5">
+                                {scheduledPapers.slice(0, 2).map((paper, idx) => (
+                                  <div
+                                    key={paper.id}
+                                    className={cn(
+                                      "text-[9px] px-1 py-0.5 rounded truncate",
+                                      "bg-violet-500/10 text-violet-500 border border-violet-500/20",
+                                      "hover:bg-violet-500/20 transition-colors cursor-pointer"
+                                    )}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handlePaperClick(paper);
+                                    }}
+                                  >
+                                    {paper.estimated_time && (
+                                      <span className="mr-1 opacity-70">{paper.estimated_time}m</span>
+                                    )}
+                                    {paper.title}
+                                  </div>
+                                ))}
+                                {scheduledPapers.length > 2 && (
+                                  <div className="text-[9px] text-[#4a5578] px-1">
+                                    +{scheduledPapers.length - 2} more
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Selected Day Schedule */}
+                    <div className="mt-4 bg-[#030014] rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-sm font-medium text-white">
+                          Schedule for {format(selectedDate, 'MMMM d, yyyy')}
+                        </h3>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2.5 text-[11px] hover:bg-[#2a3142] text-violet-500"
+                          onClick={() => {
+                            // Open schedule dialog for this date
+                            // You can implement this functionality
+                          }}
+                        >
+                          <Plus className="h-3.5 w-3.5 mr-1.5" />
+                          Add paper
+                        </Button>
+                      </div>
+
+                      <div className="space-y-2">
+                        {papers
+                          .filter(p => {
+                            if (!p.scheduled_date) return false;
+                            const paperDate = new Date(p.scheduled_date);
+                            return format(paperDate, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd');
+                          })
+                          .sort((a, b) => {
+                            if (!a.scheduled_date || !b.scheduled_date) return 0;
+                            return new Date(a.scheduled_date).getTime() - new Date(b.scheduled_date).getTime();
+                          })
+                          .map(paper => (
+                            <div
+                              key={paper.id}
+                              className="flex items-start gap-3 p-2 hover:bg-[#2a3142] rounded-lg transition-colors cursor-pointer group"
+                              onClick={() => handlePaperClick(paper)}
+                            >
+                              <div className="w-12 text-center">
+                                <div className="text-[11px] font-medium text-violet-500">
+                                  {paper.estimated_time}m
+                                </div>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <h4 className="text-sm text-white group-hover:text-violet-500 transition-colors line-clamp-1">
+                                  {paper.title}
+                                </h4>
+                                {paper.authors && (
+                                  <p className="text-[11px] text-[#4a5578] line-clamp-1">
+                                    {paper.authors.join(', ')}
+                                  </p>
+                                )}
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 hover:bg-[#2a3142]"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  // Implement edit schedule functionality
+                                }}
+                              >
+                                <Clock className="h-3.5 w-3.5 text-[#4a5578]" />
+                              </Button>
+                            </div>
+                          ))}
+                      </div>
                     </div>
                   </div>
-
-                  {scheduledViewMode === 'grid' ? (
-                    <div className="h-[calc(100vh-12rem)] overflow-y-auto space-y-2">
-                      {isLoading ? (
-                        <motion.div 
-                          className="h-full bg-[#030014]"
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                        >
-                          <div className="p-6 border-b border-[#1a1f2e]">
-                            <div className="max-w-3xl">
-                              <Skeleton className="h-7 w-48 bg-[#1a1f2e]" />
-                              <Skeleton className="h-4 w-96 mt-2 bg-[#1a1f2e]" />
-                            </div>
-                          </div>
-                          <div className="p-6">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                              {[...Array(6)].map((_, i) => (
-                                <Card key={i} className="p-4 bg-[#1a1f2e] border-[#2a3142]">
-                                  <div className="flex items-start gap-3">
-                                    <Skeleton className="h-10 w-10 rounded bg-[#2a3142]" />
-                                    <div className="flex-1">
-                                      <div className="flex items-center gap-2 mb-2">
-                                        <Skeleton className="h-4 w-24 bg-[#2a3142]" />
-                                        <Skeleton className="h-4 w-4 rounded-full bg-[#2a3142]" />
-                                      </div>
-                                      <Skeleton className="h-4 w-full mb-2 bg-[#2a3142]" />
-                                      <Skeleton className="h-4 w-2/3 bg-[#2a3142]" />
-                                    </div>
-                                  </div>
-                                </Card>
-                              ))}
-                            </div>
-                          </div>
-                        </motion.div>
-                      ) : (
-                        <motion.div 
-                          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
-                          variants={containerVariants}
-                          initial="hidden"
-                          animate="visible"
-                        >
-                          {papers.map((paper) => (
-                            <motion.div key={paper.id} variants={itemVariants}>
-                              <PaperCard
-                                paper={paper}
-                                onSchedule={(date, estimatedTime, repeat) => 
-                                  handleSchedulePaper(paper, date, estimatedTime, repeat)
-                                }
-                                onDelete={() => handleDeletePaper(paper)}
-                                isLoading={isLoading}
-                                context="reading-list"
-                                variant="compact"
-                              />
-                            </motion.div>
-                          ))}
-                        </motion.div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="h-[calc(100vh-12rem)] overflow-y-auto">
-                      <div className="bg-[#030014] rounded-lg">
-                        {/* Calendar Header */}
-                        <div className="flex items-center justify-between p-4 border-b border-[#1a1f2e]">
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                const prev = new Date(selectedDate);
-                                prev.setMonth(prev.getMonth() - 1);
-                                setSelectedDate(prev);
-                              }}
-                              className="h-7 w-7 p-0 hover:bg-[#2a3142]"
-                            >
-                              <ChevronDown className="h-4 w-4 rotate-90 text-[#4a5578]" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                const next = new Date(selectedDate);
-                                next.setMonth(next.getMonth() + 1);
-                                setSelectedDate(next);
-                              }}
-                              className="h-7 w-7 p-0 hover:bg-[#2a3142]"
-                            >
-                              <ChevronDown className="h-4 w-4 -rotate-90 text-[#4a5578]" />
-                            </Button>
-                            <h3 className="text-sm font-medium text-white">
-                              {format(selectedDate, 'MMMM yyyy')}
-                            </h3>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setSelectedDate(new Date())}
-                            className="h-7 px-2.5 text-[11px] hover:bg-[#2a3142] text-[#4a5578]"
-                          >
-                            Today
-                          </Button>
-                        </div>
-
-                        {/* Calendar Grid - Make it more compact */}
-                        <div className="grid grid-cols-7 auto-rows-[80px]">
-                          {Array.from({ length: 42 }, (_, i) => {
-                            const date = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
-                            date.setDate(1 - date.getDay() + i);
-                            
-                            const isCurrentMonth = date.getMonth() === selectedDate.getMonth();
-                            const isToday = format(date, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
-                            const isSelected = format(date, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd');
-                            
-                            const scheduledPapers = papers.filter(p => {
-                              if (!p.scheduled_date) return false;
-                              const paperDate = new Date(p.scheduled_date);
-                              return format(paperDate, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd');
-                            });
-
-                            return (
-                              <div
-                                key={i}
-                                onClick={() => handleDateSelect(date)}
-                                className={cn(
-                                  "p-1 border-r border-b border-[#1a1f2e] last:border-r-0 relative cursor-pointer hover:bg-[#2a3142]/50 transition-colors",
-                                  !isCurrentMonth && "bg-[#1a1f2e]",
-                                  isSelected && "bg-[#2a3142]"
-                                )}
-                              >
-                                <div className={cn(
-                                  "text-[11px] font-medium mb-1 rounded-full w-5 h-5 flex items-center justify-center",
-                                  isToday ? "bg-violet-500 text-white" : "text-[#4a5578]",
-                                  !isCurrentMonth && "text-[#4a5578]"
-                                )}>
-                                  {date.getDate()}
-                                </div>
-                                <div className="space-y-0.5">
-                                  {scheduledPapers.slice(0, 2).map((paper, idx) => (
-                                    <div
-                                      key={paper.id}
-                                      className={cn(
-                                        "text-[9px] px-1 py-0.5 rounded truncate",
-                                        "bg-violet-500/10 text-violet-500 border border-violet-500/20",
-                                        "hover:bg-violet-500/20 transition-colors cursor-pointer"
-                                      )}
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handlePaperClick(paper);
-                                      }}
-                                    >
-                                      {paper.estimated_time && (
-                                        <span className="mr-1 opacity-70">{paper.estimated_time}m</span>
-                                      )}
-                                      {paper.title}
-                                    </div>
-                                  ))}
-                                  {scheduledPapers.length > 2 && (
-                                    <div className="text-[9px] text-[#4a5578] px-1">
-                                      +{scheduledPapers.length - 2} more
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {/* Selected Day Schedule */}
-                      <div className="mt-4 bg-[#030014] rounded-lg p-4">
-                        <div className="flex items-center justify-between mb-4">
-                          <h3 className="text-sm font-medium text-white">
-                            Schedule for {format(selectedDate, 'MMMM d, yyyy')}
-                          </h3>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 px-2.5 text-[11px] hover:bg-[#2a3142] text-violet-500"
-                            onClick={() => {
-                              // Open schedule dialog for this date
-                              // You can implement this functionality
-                            }}
-                          >
-                            <Plus className="h-3.5 w-3.5 mr-1.5" />
-                            Add paper
-                          </Button>
-                        </div>
-
-                        <div className="space-y-2">
-                          {papers
-                            .filter(p => {
-                              if (!p.scheduled_date) return false;
-                              const paperDate = new Date(p.scheduled_date);
-                              return format(paperDate, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd');
-                            })
-                            .sort((a, b) => {
-                              if (!a.scheduled_date || !b.scheduled_date) return 0;
-                              return new Date(a.scheduled_date).getTime() - new Date(b.scheduled_date).getTime();
-                            })
-                            .map(paper => (
-                              <div
-                                key={paper.id}
-                                className="flex items-start gap-3 p-2 hover:bg-[#2a3142] rounded-lg transition-colors cursor-pointer group"
-                                onClick={() => handlePaperClick(paper)}
-                              >
-                                <div className="w-12 text-center">
-                                  <div className="text-[11px] font-medium text-violet-500">
-                                    {paper.estimated_time}m
-                                  </div>
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <h4 className="text-sm text-white group-hover:text-violet-500 transition-colors line-clamp-1">
-                                    {paper.title}
-                                  </h4>
-                                  {paper.authors && (
-                                    <p className="text-[11px] text-[#4a5578] line-clamp-1">
-                                      {paper.authors.join(', ')}
-                                    </p>
-                                  )}
-                                </div>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 hover:bg-[#2a3142]"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    // Implement edit schedule functionality
-                                  }}
-                                >
-                                  <Clock className="h-3.5 w-3.5 text-[#4a5578]" />
-                                </Button>
-                              </div>
-                            ))}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                )}
               </TabsContent>
 
-              <TabsContent value="unscheduled" className="flex-1 min-h-0 mt-3">
-                <div className="h-full overflow-y-auto">
+              <TabsContent value="unscheduled" className="flex-1 overflow-y-auto p-3">
+                <div className="space-y-2">
                   {papers.filter(p => !p.scheduled_date).map(paper => (
-                    <div key={paper.id} onClick={() => handlePaperClick(paper)}>
+                    <motion.div key={paper.id} variants={itemVariants}>
                       <PaperCard
                         paper={paper}
                         onDelete={() => handleDeletePaper(paper)}
-                        onAddToList={() => handleAddToList(paper)}
                         onSchedule={(date, time, repeat) => handleSchedulePaper(paper, date, time, repeat)}
                         isLoading={isLoading}
                         context="reading-list"
+                        variant="compact"
                       />
-                    </div>
+                    </motion.div>
                   ))}
                 </div>
               </TabsContent>
