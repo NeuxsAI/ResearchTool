@@ -3,9 +3,10 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { createClient } from "@/lib/supabase/client"
-import { Github, Loader2 } from "lucide-react"
+import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
+import supabase from "@/lib/supabase/client"
+import { Github, Loader2 } from "lucide-react"
 import { useRouter } from 'next/navigation'
 import { useSearchParams } from 'next/navigation'
 
@@ -13,7 +14,6 @@ export function AuthForm() {
   const [isLoading, setIsLoading] = useState(false)
   const [password, setPassword] = useState("")
   const [email, setEmail] = useState("")
-  const supabase = createClient()
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirectTo = searchParams.get('redirectTo') || '/main'
@@ -21,46 +21,72 @@ export function AuthForm() {
   async function signInWithGithub() {
     try {
       setIsLoading(true)
-      const { error } = await supabase.auth.signInWithOAuth({
+      console.log("Attempting GitHub sign in...")
+      
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "github",
         options: {
-          redirectTo: `${location.origin}/auth/callback?redirectTo=${encodeURIComponent(redirectTo)}`,
+          redirectTo: `${window.location.origin}/auth/callback?redirectTo=${encodeURIComponent(redirectTo)}`,
           scopes: 'read:user user:email',
         },
       })
-      if (error) throw error
-    } catch (error) {
-      toast.error("Could not sign in with GitHub")
-      console.error("Error:", error)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  async function signInWithEmail() {
-    if (!email || !password) return
-       
-    try {
-      setIsLoading(true)
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
       
       if (error) throw error
-      toast.success("Signed in successfully!")
-      router.push(redirectTo)
-      router.refresh() // Force a refresh of the page data
+      
+      if (data.url) {
+        console.log("Redirecting to GitHub auth URL:", data.url)
+        window.location.href = data.url
+      } else {
+        throw new Error("No OAuth URL returned")
+      }
     } catch (error) {
-      toast.error("Failed to sign in")
-      console.error("Error:", error)
+      console.error("Error signing in with GitHub:", error)
+      toast.error("Could not sign in with GitHub")
     } finally {
       setIsLoading(false)
     }
   }
 
-  
-       
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setIsLoading(true);
+      console.log("Attempting sign in with email...");
+      
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      
+      if (error) throw error;
+      
+      // Verify session was created
+      const { data: { session } } = await supabase.auth.getSession();
+      console.log("Auth response:", {
+        user: data.user ? "present" : "missing",
+        session: session ? "present" : "missing",
+      });
+
+      if (!session) {
+        throw new Error("No session established after sign in");
+      }
+      
+      toast.success("Signed in successfully!")
+      
+      // Add a small delay to ensure session is properly set
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      console.log("Redirecting to:", redirectTo);
+      // Use window.location for a hard redirect
+      window.location.href = redirectTo;
+    } catch (error) {
+      console.error("Error signing in:", error);
+      toast.error("Failed to sign in. Please check your credentials.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-4 min-w-[300px]">
       <Button
@@ -102,7 +128,7 @@ export function AuthForm() {
           disabled={isLoading}
         />
         <Button
-          onClick={signInWithEmail}
+          onClick={handleSubmit}
           disabled={isLoading || !email || !password}
           className="bg-white text-black hover:bg-gray-100 relative h-11"
         >

@@ -13,6 +13,7 @@ import { Paper } from "@/lib/types";
 import { useRouter } from "next/navigation";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Annotation } from "@/lib/types";
+import { toast } from "react-hot-toast";
 
 
 export interface PaperCardProps {
@@ -31,6 +32,7 @@ export interface PaperCardProps {
   isAdding?: boolean;
   className?: string;
   annotations?: Annotation[];
+  disableNavigation?: boolean;
 }
 
 export function PaperCard({ 
@@ -48,7 +50,8 @@ export function PaperCard({
   onAddToLibrary,
   isAdding,
   className,
-  annotations = []
+  annotations = [],
+  disableNavigation = false
 }: PaperCardProps) {
   const router = useRouter();
   const [date, setDate] = useState<Date | undefined>(() => 
@@ -61,6 +64,7 @@ export function PaperCard({
     paper.repeat || "none"
   );
   const [open, setOpen] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Memoize state calculations to prevent unnecessary re-renders
   const isScheduled = !!paper.scheduled_date;
@@ -86,23 +90,14 @@ export function PaperCard({
   };
 
   // Handle card click based on context
-  const handleCardClick = (e: React.MouseEvent) => {
-    // Don't navigate if clicking on interactive elements
-    if (
-      (e.target as HTMLElement).closest('button') ||
-      (e.target as HTMLElement).closest('[role="dialog"]') ||
-      (e.target as HTMLElement).closest('[role="listbox"]')
-    ) {
-      return;
-    }
-    
-    // Only navigate if the paper is in the library or if it's not a search result
-    if (paper.in_reading_list || context !== 'search') {
+  const handleCardClick = () => {
+    if (!disableNavigation) {
       router.push(`/paper/${paper.id}`);
     }
   };
 
   const handleSchedule = (e: React.MouseEvent) => {
+    e.preventDefault();
     e.stopPropagation();
     if (isLoading || !date || !onSchedule) return;
     
@@ -111,10 +106,18 @@ export function PaperCard({
     setOpen(false);
   };
 
-  const handleAddToList = (e: React.MouseEvent) => {
+  const handleAddToList = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (isLoading || !onAddToList) return;
-    onAddToList();
+    if (isLoading || isProcessing || !onAddToList) return;
+    
+    try {
+      setIsProcessing(true);
+      await onAddToList();
+    } catch (error) {
+      console.error('Error adding paper:', error);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleAddToLibrary = (e: React.MouseEvent) => {
@@ -145,6 +148,7 @@ export function PaperCard({
           variant === 'compact' 
             ? 'p-3 flex flex-col min-h-[100px] max-h-[120px]' 
             : 'p-4 flex flex-col min-h-[160px]',
+          !disableNavigation && "cursor-pointer",
           className || ''
         )}
         onClick={handleCardClick}
@@ -267,61 +271,66 @@ export function PaperCard({
           )}
 
           {/* Action buttons */}
-          <div className="flex items-center gap-2 mt-auto">
+          <div className="flex items-center gap-1.5 mt-auto" onClick={(e) => e.stopPropagation()}>
             {shouldShowScheduleButton && onSchedule && (
               <Popover open={open} onOpenChange={setOpen}>
                 <PopoverTrigger asChild>
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-7 px-2 text-[10px] font-medium rounded-md text-[#4a5578] hover:text-white hover:bg-[#1E3A8A]/20"
+                    className={cn(
+                      "h-6 gap-1.5 px-2 text-[10px] hover:bg-[#1E3A8A]/20",
+                      isScheduled ? "text-[#60A5FA]" : "text-[#4a5578]"
+                    )}
+                    disabled={isLoading}
                   >
-                    <Calendar className="h-3.5 w-3.5 mr-1.5" />
-                    Schedule
+                    {isLoading ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Calendar className="h-3 w-3" />
+                    )}
+                    {isScheduled ? "Scheduled" : "Schedule"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent 
-                  className="w-auto p-0 bg-[#0A192F] border-[#1E3A8A] rounded-lg shadow-lg" 
-                  align="end"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                  }}
+                  className="w-auto p-0 bg-[#0A192F] border-[#1E3A8A]"
                 >
                   <div className="p-3">
                     <div className="space-y-3">
-                      <CalendarComponent
-                        mode="single"
-                        selected={date}
-                        onSelect={setDate}
-                        className="rounded-lg border-[#1E3A8A]"
-                      />
-                      <div className="flex gap-1.5">
+                      <div className="space-y-1.5">
+                        <CalendarComponent
+                          mode="single"
+                          selected={date}
+                          onSelect={(newDate) => {
+                            if (newDate) setDate(newDate);
+                          }}
+                          className="rounded-md border border-[#1E3A8A]"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
                         <Input
                           type="number"
-                          min="1"
-                          placeholder="Est. time (min)"
-                          className="h-7 text-[10px] bg-[#0A192F] border-[#1E3A8A] text-[#4a5578] placeholder:text-[#4a5578]"
+                          placeholder="Estimated time (minutes)"
                           value={estimatedTime}
                           onChange={(e) => handleEstimatedTimeChange(e.target.value)}
+                          className="h-7 text-[11px] bg-[#0A192F] border-[#1E3A8A] text-white placeholder:text-[#4a5578]"
                         />
-                        <Select 
-                          value={repeat} 
-                          onValueChange={(value: "daily" | "weekly" | "monthly" | "none") => setRepeat(value)}
-                        >
-                          <SelectTrigger className="h-7 text-[10px] bg-[#0A192F] border-[#1E3A8A] text-[#4a5578]">
+                      </div>
+                      <div className="space-y-1.5">
+                        <Select value={repeat} onValueChange={setRepeat}>
+                          <SelectTrigger className="h-7 text-[11px] bg-[#0A192F] border-[#1E3A8A] text-white">
                             <SelectValue placeholder="Repeat" />
                           </SelectTrigger>
-                          <SelectContent className="bg-[#0A192F] border-[#1E3A8A]">
-                            <SelectItem value="none" className="text-[10px]">No repeat</SelectItem>
-                            <SelectItem value="daily" className="text-[10px]">Daily</SelectItem>
-                            <SelectItem value="weekly" className="text-[10px]">Weekly</SelectItem>
-                            <SelectItem value="monthly" className="text-[10px]">Monthly</SelectItem>
+                          <SelectContent>
+                            <SelectItem value="none">No repeat</SelectItem>
+                            <SelectItem value="daily">Daily</SelectItem>
+                            <SelectItem value="weekly">Weekly</SelectItem>
+                            <SelectItem value="monthly">Monthly</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
-                      <Button 
-                        className="w-full h-7 text-[10px] bg-[#1E3A8A] text-white hover:bg-[#1E3A8A]/80 rounded-md font-medium"
+                      <Button
+                        className="w-full h-7 text-[11px] bg-[#1E3A8A] hover:bg-[#2D4A9E] text-white"
                         onClick={handleSchedule}
                         disabled={!date}
                       >
@@ -337,11 +346,21 @@ export function PaperCard({
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 px-2 text-[10px] font-medium hover:bg-[#1E3A8A]/20 text-[#4a5578] hover:text-white rounded-md ml-auto"
+                className={cn(
+                  "h-7 px-2 text-[10px] font-medium hover:bg-[#1E3A8A]/20 rounded-md ml-auto",
+                  paper.in_reading_list 
+                    ? "text-blue-400 hover:text-blue-300" 
+                    : "text-[#4a5578] hover:text-white"
+                )}
                 onClick={handleAddToList}
-                disabled={isLoading || isInReadingList}
+                disabled={isProcessing || paper.in_reading_list}
               >
-                {isInReadingList ? (
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                    Adding...
+                  </>
+                ) : paper.in_reading_list ? (
                   <>
                     <BookMarked className="h-3.5 w-3.5 mr-1.5" />
                     In Library

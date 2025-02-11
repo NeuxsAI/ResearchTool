@@ -4,15 +4,16 @@ import type { CookieStore } from '@supabase/ssr/dist/shared-types';
 
 // Server-side client creation - supports both cookie store and token
 export const createClient = (cookieStoreOrToken?: CookieStore | string) => {
-  const options: any = {};
-
-  if (typeof cookieStoreOrToken === 'string') {
-    // Token-based auth
-    options.auth = {
+  const options: any = {
+    auth: {
       persistSession: false,
       autoRefreshToken: false,
       detectSessionInUrl: false
-    };
+    }
+  };
+
+  if (typeof cookieStoreOrToken === 'string') {
+    // Token-based auth
     options.global = {
       headers: {
         Authorization: `Bearer ${cookieStoreOrToken}`
@@ -29,7 +30,7 @@ export const createClient = (cookieStoreOrToken?: CookieStore | string) => {
         await cookieStoreOrToken.set({ name, value, ...options });
       },
       async remove(name: string, options: { path: string }) {
-        await cookieStoreOrToken.set({ name, value: '', ...options });
+        await cookieStoreOrToken.set({ name, value: '', ...options, maxAge: -1 });
       }
     };
   }

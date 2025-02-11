@@ -1,3 +1,4 @@
+import React, { useState } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -9,24 +10,68 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Loader2 } from "lucide-react";
+import { deletePaper } from "@/lib/supabase/db";
+import { toast } from "sonner";
+import { cache, CACHE_KEYS } from "@/lib/cache";
 
 interface DeletePaperDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onConfirm: () => Promise<void>;
+  paperId: string;
   paperTitle: string;
-  isDeleting: boolean;
+  onSuccess?: () => void;
 }
 
 export function DeletePaperDialog({
   open,
   onOpenChange,
-  onConfirm,
+  paperId,
   paperTitle,
-  isDeleting
+  onSuccess
 }: DeletePaperDialogProps) {
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    if (!paperId) return;
+
+    try {
+      setIsDeleting(true);
+      const result = await deletePaper(paperId);
+      
+      if (result.error) {
+        throw result.error;
+      }
+
+      // Clear all relevant caches
+      cache.delete(CACHE_KEYS.PAPERS);
+      cache.delete(CACHE_KEYS.READING_LIST);
+      cache.delete(CACHE_KEYS.RECENT_PAPERS);
+      cache.delete(CACHE_KEYS.ANNOTATIONS(paperId));
+      
+      onSuccess?.();
+      toast.success("Paper deleted successfully");
+      window.location.reload();
+    } catch (error) {
+      console.error("Error deleting paper:", error);
+      toast.error("Failed to delete paper");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
+    <AlertDialog 
+      open={open} 
+      onOpenChange={(newOpen) => {
+        if (isDeleting) return; // Prevent closing while deleting
+        if (!newOpen && open) {
+          // Dialog is being closed by user action
+          onOpenChange(false);
+        } else {
+          onOpenChange(newOpen);
+        }
+      }}
+    >
       <AlertDialogContent className="bg-[#030014] border-[#2a2a2a]">
         <AlertDialogHeader>
           <AlertDialogTitle className="text-white">Delete Paper</AlertDialogTitle>
@@ -43,11 +88,8 @@ export function DeletePaperDialog({
           </AlertDialogCancel>
           <AlertDialogAction
             className="bg-red-500/10 text-red-500 hover:bg-red-500/20"
-            onClick={async (e) => {
-              e.preventDefault();
-              await onConfirm();
-            }}
             disabled={isDeleting}
+            onClick={handleDelete}
           >
             {isDeleting ? (
               <>

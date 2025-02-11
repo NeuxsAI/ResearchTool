@@ -12,11 +12,12 @@ import { useRouter } from "next/navigation";
 import { Paper } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence } from "framer-motion";
-import { addToReadingList } from "@/lib/supabase/db";
+import { addPaperFromDiscovery } from "@/lib/supabase/db";
 import { cache, CACHE_KEYS } from '@/lib/cache';
 import { PaperCard } from "@/components/paper-card";
-import { createClient } from "@/lib/supabase/client";
+import supabase from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import { useUser } from "@/hooks/use-user";
 
 // Preload function for parallel data fetching
 async function preloadPapers(refresh = false) {
@@ -50,6 +51,7 @@ async function preloadPapers(refresh = false) {
 }
 
 export default function DiscoverPage() {
+  const { user } = useUser();
   const [papers, setPapers] = useState<Paper[]>([]);
   const [trendingPapers, setTrendingPapers] = useState<Paper[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -196,54 +198,41 @@ export default function DiscoverPage() {
   };
 
   const handleAddPaper = async (paper: Paper) => {
-    setAddingPaperId(paper.id);
+    // Optimistically update UI first
+    const updatePaperInList = (p: Paper) => 
+      p.id === paper.id ? { ...p, in_reading_list: true } : p;
+
+    setPapers(prev => prev.map(updatePaperInList));
+    setTrendingPapers(prev => prev.map(updatePaperInList));
+    setSearchResults(prev => prev.map(updatePaperInList));
+
     try {
-      // Get auth token
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        throw new Error('Not authenticated');
-      }
-
-      // Create form data - same as add-paper-dialog
-      const formData = new FormData();
-      formData.append('title', paper.title);
-      formData.append('authors', JSON.stringify(paper.authors));
-      formData.append('year', paper.year.toString());
-      formData.append('abstract', paper.abstract || '');
-      formData.append('url', paper.url || '');
-
-      // Submit to API route - same as add-paper-dialog
-      const response = await fetch('/api/papers', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`
-        },
-        body: formData
+      // Add paper to library in background
+      const { error } = await addPaperFromDiscovery({
+        title: paper.title,
+        authors: paper.authors,
+        year: paper.year,
+        abstract: paper.abstract,
+        url: paper.url,
+        citations: paper.citations,
+        impact: paper.impact,
+        topics: paper.topics
       });
-
-      if (!response.ok) {
-        const data = await response.json();
-        console.error('Failed to create paper:', data);
-        throw new Error(data.error || 'Failed to create paper');
-      }
-
-      const data = await response.json();
-
-      // Then add it to the reading list
-      const result = await addToReadingList(data.paper.id);
-
-      if (!result.data) {
-        throw new Error('Failed to add paper to reading list');
-      }
-
+      
+      if (error) throw error;
       toast.success('Paper added to library');
-      router.push(`/paper/${data.paper.id}`);
     } catch (error) {
+      // Revert UI state on error
+      const revertPaperInList = (p: Paper) => 
+        p.id === paper.id ? { ...p, in_reading_list: false } : p;
+
+      setPapers(prev => prev.map(revertPaperInList));
+      setTrendingPapers(prev => prev.map(revertPaperInList));
+      setSearchResults(prev => prev.map(revertPaperInList));
+
       console.error('Error adding paper:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to add paper');
-    } finally {
-      setAddingPaperId(null);
+      toast.error('Failed to add paper to library');
+      throw error;
     }
   };
 
@@ -290,29 +279,32 @@ export default function DiscoverPage() {
     >
       <PaperCard
         paper={paper}
-        onAddToLibrary={() => handleAddPaper(paper)}
-        isAdding={addingPaperId === paper.id}
+        onAddToList={() => handleAddPaper(paper)}
         context="discover"
-        variant="default"
         showScheduleButton={false}
         showCategoryButton={false}
-        className="max-h-[500px]"
       />
     </motion.div>
   );
 
   return (
     <MainLayout>
-      <div className="h-full bg-[#030014]">
-        <div className="p-6 border-b border-[#1a1f2e]">
-          <div className="max-w-3xl">
-            <h1 className="text-xl font-semibold text-white mb-2">Discover</h1>
-            <p className="text-sm text-[#4a5578]">
-              Discover trending and recommended papers based on your interests.
-            </p>
+      <div className="flex flex-col h-full bg-[#030014]">
+        {/* Header */}
+        <div className="border-b border-[#1a1f2e] bg-[#030014]">
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h1 className="text-sm font-medium text-white">Discover</h1>
+                <p className="text-xs text-[#4a5578]">
+                  Discover trending and recommended papers based on your interests.
+                </p>
+              </div>
+            </div>
           </div>
         </div>
 
+        {/* Main Content */}
         <div className="p-6">
           <Tabs 
             defaultValue="search" 
@@ -495,10 +487,8 @@ export default function DiscoverPage() {
                               <motion.div key={paper.id} variants={itemVariants}>
                                 <PaperCard
                                   paper={paper}
-                                  onAddToLibrary={() => handleAddPaper(paper)}
-                                  isAdding={addingPaperId === paper.id}
+                                  onAddToList={() => handleAddPaper(paper)}
                                   context="discover"
-                                  variant="compact"
                                   showScheduleButton={false}
                                   showCategoryButton={false}
                                 />
@@ -511,10 +501,8 @@ export default function DiscoverPage() {
                               <motion.div key={paper.id} variants={itemVariants}>
                                 <PaperCard
                                   paper={paper}
-                                  onAddToLibrary={() => handleAddPaper(paper)}
-                                  isAdding={addingPaperId === paper.id}
+                                  onAddToList={() => handleAddPaper(paper)}
                                   context="discover"
-                                  variant="default"
                                   showScheduleButton={false}
                                   showCategoryButton={false}
                                 />

@@ -3,13 +3,13 @@
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { motion } from "framer-motion"
-import { createClient } from "@/lib/supabase/client"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import { useSearchParams } from "next/navigation"
+import supabase from "@/lib/supabase/client"
 
 export function Navbar() {
   const [session, setSession] = useState<any>(null)
-  const supabase = createClient()
   const router = useRouter()
 
   useEffect(() => {
@@ -18,7 +18,14 @@ export function Navbar() {
       setSession(session)
     }
     getSession()
-  }, [supabase])
+
+    // Set up auth state change listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session)
+    })
+
+    return () => subscription.unsubscribe()
+  }, []) // Remove supabase dependency
 
   const scrollToEarlyAccess = () => {
     const element = document.getElementById('early-access')

@@ -5,20 +5,29 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
-  const url = request.nextUrl.searchParams.get('url');
-  if (!url) {
-    return NextResponse.json({ error: 'URL parameter is required' }, { status: 400 });
-  }
-
-  // Validate URL format
   try {
-    new URL(url);
-  } catch {
-    return NextResponse.json({ error: 'Invalid URL format' }, { status: 400 });
-  }
+    const { searchParams } = new URL(request.url);
+    let url = searchParams.get('url');
+    
+    if (!url) {
+      return NextResponse.json({ error: 'URL parameter is required' }, { status: 400 });
+    }
 
-  // Validate that URL points to a PDF
-  // {TODO: Figure out if this is even needed tbh}
+    // Convert arxiv abstract URL to PDF URL
+    if (url.includes('arxiv.org/abs/')) {
+      const arxivId = url.split('/').pop();
+      url = `https://arxiv.org/pdf/${arxivId}.pdf`;
+    }
+
+    // Validate URL format
+    try {
+      new URL(url);
+    } catch {
+      return NextResponse.json({ error: 'Invalid URL format' }, { status: 400 });
+    }
+
+    // Validate that URL points to a PDF
+    // {TODO: Figure out if this is even needed tbh}
     //   const validDomains = [
     //     'arxiv.org',
     //     'researchgate.net',
@@ -29,7 +38,7 @@ export async function GET(request: NextRequest) {
     //     'sciencedirect.com'
     //   ];
 
-  const urlObj = new URL(url);
+    const urlObj = new URL(url);
     //const isDomainValid = validDomains.some(domain => urlObj.hostname.includes(domain));
 
     //   if (!isPDF) {
@@ -38,17 +47,18 @@ export async function GET(request: NextRequest) {
     //     }, { status: 400 });
     //   }
 
-  try {
-    // Fetch with appropriate headers
+    // Fetch the PDF with appropriate headers
     const response = await fetch(url, {
       headers: {
-        'Accept': 'application/pdf',
-        'User-Agent': 'Mozilla/5.0 (compatible; ResearchAssistant/1.0)'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
       }
     });
-    
+
     if (!response.ok) {
-      throw new Error(`Failed to fetch PDF: ${response.statusText}`);
+      return NextResponse.json(
+        { error: `Failed to fetch PDF: ${response.statusText}` },
+        { status: response.status }
+      );
     }
 
     const contentType = response.headers.get('content-type');
@@ -58,19 +68,23 @@ export async function GET(request: NextRequest) {
       }, { status: 400 });
     }
 
+    // Get the PDF content
     const pdfBuffer = await response.arrayBuffer();
-    
+
+    // Return the PDF with appropriate headers
     return new NextResponse(pdfBuffer, {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename=paper.pdf`,
+        'Content-Length': pdfBuffer.byteLength.toString(),
+        'Access-Control-Allow-Origin': '*',
         'Cache-Control': 'public, max-age=3600'
       }
     });
   } catch (error) {
     console.error('Error fetching PDF:', error);
-    return NextResponse.json({ 
-      error: error instanceof Error ? error.message : 'Failed to fetch PDF' 
-    }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to fetch PDF' },
+      { status: 500 }
+    );
   }
 }

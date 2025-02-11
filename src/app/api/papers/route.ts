@@ -1,24 +1,11 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { uploadPDF } from '@/lib/supabase/storage';
-import { createPaper } from '@/lib/supabase/db';
 import { cookies } from 'next/headers';
 
 export async function POST(request: Request) {
   try {
-    // Get auth token from request header
-    const authHeader = request.headers.get('Authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      console.error('Missing or invalid authorization header');
-      return NextResponse.json(
-        { error: 'Missing or invalid authorization header' },
-        { status: 401 }
-      );
-    }
-
-    // Get the token and create Supabase client with it
-    const token = authHeader.split(' ')[1];
-    const supabase = createClient(token);
+    const cookieStore = cookies();
+    const supabase = createClient(cookieStore);
     
     // Validate user
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -31,18 +18,16 @@ export async function POST(request: Request) {
       );
     }
 
-    console.log('User authenticated:', user.id);
-
     // Get form data
     const formData = await request.formData();
-    const file = formData.get('file') as File | null;
-    const url = formData.get('url') as string | null;
     const title = formData.get('title') as string;
     const authorsStr = formData.get('authors') as string;
     const yearStr = formData.get('year') as string;
     const abstract = formData.get('abstract') as string;
-    const categoryId = formData.get('categoryId') as string;
-    const arxivId = formData.get('arxiv_id') as string;
+    const url = formData.get('url') as string;
+    const citations = formData.get('citations') as string;
+    const impact = formData.get('impact') as string;
+    const topicsStr = formData.get('topics') as string;
 
     // Parse and validate the data
     if (!title?.trim()) {
@@ -63,41 +48,46 @@ export async function POST(request: Request) {
       );
     }
 
-    const year = parseInt(yearStr);
-    if (isNaN(year)) {
+    let topics: string[] = [];
+    try {
+      topics = topicsStr ? JSON.parse(topicsStr) : [];
+    } catch (e) {
+      console.error('Error parsing topics:', e);
       return NextResponse.json(
-        { error: 'Invalid year' },
+        { error: 'Invalid topics format' },
         { status: 400 }
       );
     }
 
-    // Create the paper
-    const paperData = {
-      title,
-      authors,
-      year,
-      abstract: abstract || '',
-      url: url || '',
-      category_id: categoryId || null,
-      arxiv_id: arxivId || null,
-      user_id: user.id
-    };
+    // Insert into papers table with only the fields that exist
+    const { data: paper, error: insertError } = await supabase
+      .from('papers')
+      .insert({
+        title,
+        authors,
+        year: parseInt(yearStr),
+        abstract: abstract || '',
+        url: url || '',
+        created_at: new Date().toISOString(),
+        user_id: user.id
+      })
+      .select()
+      .single();
 
-    const { data: paper, error: paperError } = await createPaper(paperData, token);
-    
-    if (paperError) {
-      console.error('Error creating paper:', paperError);
+    if (insertError) {
+      console.error('Insert error:', insertError);
       return NextResponse.json(
-        { error: `Failed to save paper to database: ${paperError.message}` },
+        { error: 'Failed to add paper' },
         { status: 500 }
       );
     }
 
     return NextResponse.json({ paper });
+
   } catch (error) {
-    console.error('Error in POST /api/papers:', error);
+    console.error('Server error:', error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to create paper' },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

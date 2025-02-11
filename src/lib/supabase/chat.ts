@@ -1,4 +1,5 @@
-import { createClient } from "@/lib/supabase/client";
+import supabase from "@/lib/supabase/client";
+import { cache, CACHE_KEYS } from "@/lib/cache";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -10,9 +11,6 @@ export async function updateChatHistory(
   annotationId: string,
   newMessage: ChatMessage
 ) {
-  const supabase = createClient();
-
-  // First get the current chat history
   const { data: annotation, error: fetchError } = await supabase
     .from("annotations")
     .select("chat_history")
@@ -43,8 +41,6 @@ export async function updateChatHistory(
 }
 
 export async function getChatHistory(annotationId: string) {
-  const supabase = createClient();
-
   const { data, error } = await supabase
     .from("annotations")
     .select("chat_history")

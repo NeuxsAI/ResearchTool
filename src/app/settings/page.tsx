@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useUser } from "@/lib/context/user-context";
-import { createClient } from "@/lib/supabase/client";
+import supabase from "@/lib/supabase/client";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -14,7 +14,6 @@ export default function SettingsPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [fullName, setFullName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
-  const supabase = createClient();
 
   useEffect(() => {
     async function loadProfile() {

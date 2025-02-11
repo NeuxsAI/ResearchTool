@@ -1,5 +1,5 @@
 import { createClient as createServerClient } from './server'
-import { createClient as createBrowserClient } from './client'
+import supabase from './client'
 import type { Category, Paper, Annotation, Board, BoardItem, ReadingListItem, DbResult, DbArrayResult, DiscoveredPaper } from '@/lib/supabase/types'
 import { cache, CACHE_KEYS } from '../cache'
 
@@ -63,7 +63,6 @@ export async function getCategories(): Promise<DbArrayResult<Category>> {
   const cachedCategories = cache.get(CACHE_KEYS.CATEGORIES)
   if (cachedCategories) return { data: cachedCategories, error: null }
   
-  const supabase = createBrowserClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { data: [], error: null }
   
@@ -80,7 +79,6 @@ export async function getCategories(): Promise<DbArrayResult<Category>> {
 }
 
 export async function getCategoryById(id: string): Promise<DbResult<Category>> {
-  const supabase = createBrowserClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { data: null, error: new Error('Not authenticated') }
   
@@ -93,7 +91,6 @@ export async function getCategoryById(id: string): Promise<DbResult<Category>> {
 }
 
 export async function createCategory(category: Partial<Category>): Promise<DbResult<Category>> {
-  const supabase = createBrowserClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('User not authenticated')
   
@@ -105,7 +102,6 @@ export async function createCategory(category: Partial<Category>): Promise<DbRes
 }
 
 export async function updateCategory(id: string, category: Partial<Category>): Promise<DbResult<Category>> {
-  const supabase = createBrowserClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { data: null, error: new Error('Not authenticated') }
   
@@ -119,7 +115,6 @@ export async function updateCategory(id: string, category: Partial<Category>): P
 }
 
 export async function deleteCategory(id: string): Promise<DbResult<Category>> {
-  const supabase = createBrowserClient()
   return await supabase.from('categories').delete().eq('id', id).select().single()
 }
 
@@ -128,7 +123,6 @@ export const getPapers = async (): Promise<DbArrayResult<Paper>> => {
   const cachedPapers = cache.get(CACHE_KEYS.PAPERS)
   if (cachedPapers) return { data: cachedPapers, error: null }
   
-  const supabase = createBrowserClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { data: [], error: null }
   
@@ -145,23 +139,18 @@ export const getPapers = async (): Promise<DbArrayResult<Paper>> => {
 }
 
 export async function getPapersByCategory(categoryId: string): Promise<DbArrayResult<Paper>> {
-  const supabase = createBrowserClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { data: [], error: null }
   
   return await supabase
     .from('papers')
-    .select(`
-      *,
-      annotations:annotations(count)
-    `)
+    .select('*')
     .eq('category_id', categoryId)
     .eq('user_id', user.id)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
 }
 
 export async function getPaperById(id: string): Promise<DbResult<Paper>> {
-  const supabase = createBrowserClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { data: null, error: new Error('Not authenticated') }
   
@@ -192,33 +181,22 @@ export async function addPaperFromDiscovery(
     year: number;
     abstract?: string;
     url: string;
-    citations?: number;
-    impact?: 'high' | 'low';
-    topics?: string[];
-    arxiv_id?: string;
   },
   categoryId?: string
 ): Promise<DbResult<Paper>> {
-  const supabase = createBrowserClient();
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.access_token) {
     return { data: null, error: new Error('Not authenticated') };
   }
 
   try {
-    // Create form data
+    // Create form data with only fields that exist in the papers table
     const formData = new FormData();
     formData.append('title', paper.title);
     formData.append('authors', JSON.stringify(paper.authors));
     formData.append('year', paper.year.toString());
     formData.append('abstract', paper.abstract || '');
     formData.append('url', paper.url || '');
-    if (categoryId) {
-      formData.append('categoryId', categoryId);
-    }
-    if (paper.arxiv_id) {
-      formData.append('arxiv_id', paper.arxiv_id);
-    }
 
     // Submit to API route with proper headers and credentials
     const response = await fetch('/api/papers', {
@@ -257,7 +235,7 @@ export async function updatePaper(
   paper: Partial<Paper>, 
   token?: string
 ): Promise<DbResult<Paper>> {
-  const supabase = token ? createServerClient(token) : createBrowserClient();
+  const supabase = token ? createServerClient(token) : createServerClient();
   const updateData = {
     ...paper,
     updated_at: new Date().toISOString(),
@@ -270,17 +248,59 @@ export async function updatePaper(
 }
 
 export async function deletePaper(id: string, token?: string): Promise<DbResult<Paper>> {
-  const supabase = createBrowserClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { data: null, error: new Error('Not authenticated') }
   
-  return await supabase
-    .from('papers')
-    .delete()
-    .eq('id', id)
-    .eq('user_id', user.id)
-    .select()
-    .single()
+  try {
+    // First get the paper data
+    const { data: paper, error: getError } = await supabase
+      .from('papers')
+      .select('*')
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .single()
+    
+    if (getError) {
+      console.error('Error getting paper:', getError)
+      return { data: null, error: getError }
+    }
+
+    // Delete related paper chunks first
+    const { error: chunksError } = await supabase
+      .from('paper_chunks')
+      .delete()
+      .eq('paper_id', id)
+
+    if (chunksError) {
+      console.error('Error deleting paper chunks:', chunksError)
+      return { data: null, error: chunksError }
+    }
+    
+    // Then delete the paper
+    const { error: deleteError } = await supabase
+      .from('papers')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user.id)
+    
+    if (deleteError) {
+      console.error('Error deleting paper:', deleteError)
+      return { data: null, error: deleteError }
+    }
+    
+    // Clear cache
+    cache.delete(CACHE_KEYS.PAPERS)
+    cache.delete(CACHE_KEYS.READING_LIST)
+    cache.delete(CACHE_KEYS.ANNOTATIONS as unknown as string)
+    
+    return { data: paper, error: null }
+  } catch (error) {
+    console.error('Error in deletePaper:', error)
+    return { 
+      data: null, 
+      error: error instanceof Error ? error : new Error('Failed to delete paper')
+    }
+  }
 }
 
 // Annotations
@@ -289,7 +309,6 @@ export async function getAnnotationsByPaper(paperId: string): Promise<DbArrayRes
   const cachedAnnotations = cache.get(cacheKey)
   if (cachedAnnotations) return { data: cachedAnnotations, error: null }
   
-  const supabase = createBrowserClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { data: [], error: null }
   
@@ -309,7 +328,6 @@ export async function getAnnotationsByPaper(paperId: string): Promise<DbArrayRes
 }
 
 export async function createAnnotation(annotation: Database['public']['Tables']['annotations']['Insert']): Promise<DbResult<Annotation>> {
-  const supabase = createBrowserClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('User not authenticated');
   
@@ -320,18 +338,15 @@ export async function createAnnotation(annotation: Database['public']['Tables'][
 }
 
 export async function updateAnnotation(id: string, annotation: Partial<Annotation>): Promise<DbResult<Annotation>> {
-  const supabase = createBrowserClient()
   return await supabase.from('annotations').update(annotation).eq('id', id).select().single()
 }
 
 export async function deleteAnnotation(id: string): Promise<DbResult<Annotation>> {
-  const supabase = createBrowserClient()
   return await supabase.from('annotations').delete().eq('id', id).select().single()
 }
 
 // Boards
 export const getBoards = async (): Promise<DbArrayResult<Board>> => {
-  const supabase = createBrowserClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { data: [], error: null }
   
@@ -343,7 +358,6 @@ export const getBoards = async (): Promise<DbArrayResult<Board>> => {
 }
 
 export async function getBoardById(id: string): Promise<DbResult<Board>> {
-  const supabase = createBrowserClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { data: null, error: new Error('Not authenticated') }
   
@@ -356,7 +370,6 @@ export async function getBoardById(id: string): Promise<DbResult<Board>> {
 }
 
 export async function createBoard(board: Partial<Board>): Promise<DbResult<Board>> {
-  const supabase = createBrowserClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('User not authenticated')
   
@@ -368,7 +381,6 @@ export async function createBoard(board: Partial<Board>): Promise<DbResult<Board
 }
 
 export async function updateBoard(id: string, board: Partial<Board>): Promise<DbResult<Board>> {
-  const supabase = createBrowserClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('User not authenticated')
   
@@ -382,7 +394,6 @@ export async function updateBoard(id: string, board: Partial<Board>): Promise<Db
 }
 
 export async function deleteBoard(id: string): Promise<DbResult<Board>> {
-  const supabase = createBrowserClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('User not authenticated')
   
@@ -397,7 +408,6 @@ export async function deleteBoard(id: string): Promise<DbResult<Board>> {
 
 // Board Items
 export async function getBoardItems(boardId: string): Promise<DbArrayResult<BoardItem>> {
-  const supabase = createBrowserClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { data: [], error: null }
   
@@ -409,7 +419,6 @@ export async function getBoardItems(boardId: string): Promise<DbArrayResult<Boar
 }
 
 export async function createBoardItem(item: Partial<BoardItem>): Promise<DbResult<BoardItem>> {
-  const supabase = createBrowserClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('User not authenticated')
   
@@ -421,7 +430,6 @@ export async function createBoardItem(item: Partial<BoardItem>): Promise<DbResul
 }
 
 export async function updateBoardItem(id: string, item: Partial<BoardItem>): Promise<DbResult<BoardItem>> {
-  const supabase = createBrowserClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('User not authenticated')
   
@@ -435,7 +443,6 @@ export async function updateBoardItem(id: string, item: Partial<BoardItem>): Pro
 }
 
 export async function deleteBoardItem(id: string): Promise<DbResult<BoardItem>> {
-  const supabase = createBrowserClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('User not authenticated')
   
@@ -453,7 +460,6 @@ export const getReadingList = async (): Promise<DbArrayResult<ReadingListItem>> 
   const cachedReadingList = cache.get(CACHE_KEYS.READING_LIST)
   if (cachedReadingList) return { data: cachedReadingList, error: null }
   
-  const supabase = createBrowserClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { data: [], error: null }
   
@@ -469,92 +475,47 @@ export const getReadingList = async (): Promise<DbArrayResult<ReadingListItem>> 
   return result
 }
 
-export async function addToReadingList(
-  paperId: string,
-  paperData?: Partial<Paper>
-): Promise<DbResult<ReadingListItem>> {
-  const supabase = createBrowserClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { data: null, error: new Error('User not authenticated') };
-
+export async function addToReadingList(paperId: string) {
   try {
-    // First check if we need to create the paper
-    let paper;
-    if (paperData) {
-      // Check if paper already exists by arxiv_id
-      const { data: existingPaper } = await supabase
-        .from('papers')
-        .select('*')
-        .eq('arxiv_id', paperData.arxiv_id)
-        .eq('user_id', user.id)
-        .single();
-
-      if (existingPaper) {
-        paper = existingPaper;
-      } else {
-        // Create new paper
-        const { data: newPaper, error: paperError } = await supabase
-          .from('papers')
-          .insert({
-            ...paperData,
-            user_id: user.id,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          })
-          .select()
-          .single();
-
-        if (paperError) throw paperError;
-        paper = newPaper;
-      }
-    } else {
-      // Get existing paper
-      const { data: existingPaper, error: paperError } = await supabase
-        .from('papers')
-        .select('*')
-        .eq('id', paperId)
-        .single();
-
-      if (paperError) throw paperError;
-      paper = existingPaper;
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    
+    if (userError || !user) {
+      throw new Error('Unauthorized');
     }
 
-    if (!paper) {
-      throw new Error('Paper not found and no data provided to create it');
-    }
-
-    // Check if paper is already in reading list
-    const { data: existingItem } = await supabase
+    // First check if the paper is already in the reading list
+    const { data: existing, error: checkError } = await supabase
       .from('reading_list')
-      .select('*')
-      .eq('paper_id', paper.id)
+      .select('id')
+      .eq('paper_id', paperId)
       .eq('user_id', user.id)
-      .single();
+      .maybeSingle();
 
-    if (existingItem) {
-      return { data: existingItem, error: null };
+    if (checkError) {
+      throw checkError;
     }
 
-    // Add to reading list
-    const { data: readingListItem, error: readingListError } = await supabase
+    if (existing) {
+      return { data: existing, error: null };
+    }
+
+    // If not in reading list, add it
+    const { data, error } = await supabase
       .from('reading_list')
       .insert({
-        paper_id: paper.id,
-        arxiv_id: paper.arxiv_id,
+        paper_id: paperId,
         user_id: user.id,
-        added_at: new Date().toISOString(),
-        status: 'unread'
+        added_at: new Date().toISOString()
       })
       .select()
-      .single();
+      .maybeSingle();
 
-    if (readingListError) throw readingListError;
+    if (error) {
+      console.error('Error in addToReadingList:', error);
+      throw error;
+    }
 
-    // Clear cache to force refresh
-    cache.delete(CACHE_KEYS.PAPERS);
-    cache.delete(CACHE_KEYS.READING_LIST);
-
-    return { data: readingListItem, error: null };
+    return { data, error: null };
   } catch (error) {
     console.error('Error in addToReadingList:', error);
     return { 
@@ -565,7 +526,6 @@ export async function addToReadingList(
 }
 
 export async function removeFromReadingList(id: string): Promise<DbResult<ReadingListItem>> {
-  const supabase = createBrowserClient()
   return await supabase.from('reading_list').delete().eq('id', id).select().single()
 }
 
@@ -576,7 +536,6 @@ export async function schedulePaper(
   estimatedTime?: number,
   repeat?: "daily" | "weekly" | "monthly" | "none"
 ): Promise<DbResult<ReadingListItem>> {
-  const supabase = createBrowserClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('User not authenticated');
 
@@ -636,7 +595,6 @@ export async function getScheduledPapers(
   startDate: Date,
   endDate: Date
 ): Promise<DbArrayResult<ReadingListItem & { paper_title: string; paper_authors: string[]; paper_abstract: string }>> {
-  const supabase = createBrowserClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { data: [], error: null };
 
@@ -652,7 +610,6 @@ export async function updateReadingStatus(
   id: string,
   status: 'unread' | 'in_progress' | 'completed'
 ): Promise<DbResult<ReadingListItem>> {
-  const supabase = createBrowserClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('User not authenticated');
 
@@ -666,7 +623,6 @@ export async function updateReadingStatus(
 }
 
 export async function getPapersWithDiscoveryData(): Promise<DbArrayResult<Paper>> {
-  const supabase = createBrowserClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { data: [], error: null };
 
@@ -682,123 +638,5 @@ export async function getPapersWithDiscoveryData(): Promise<DbArrayResult<Paper>
       )
     `)
     .eq('user_id', user.id)
-    .order('citations', { ascending: false });
+    .order('created_at', { ascending: false });
 }
-
-export async function trackPaperInteraction(
-  paperId: string,
-  action: 'view' | 'read' | 'schedule' | 'annotate' | 'complete',
-  metadata?: any
-) {
-  try {
-    const supabase = createBrowserClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    if (!user) {
-      throw new Error('Not authenticated');
-    }
-
-    const { error } = await supabase
-      .from('paper_interactions')
-      .insert({
-        user_id: user.id,
-        paper_id: paperId,
-        action,
-        metadata: metadata || null
-      });
-
-    if (error) throw error;
-    return { error: null };
-  } catch (error) {
-    console.error('Error tracking paper interaction:', error);
-    return { error };
-  }
-}
-
-// Function to get user's paper interactions
-export async function getUserPaperInteractions(limit?: number) {
-  try {
-    const supabase = createBrowserClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    if (!user) {
-      throw new Error('Not authenticated');
-    }
-
-    let query = supabase
-      .from('paper_interactions')
-      .select(`
-        *,
-        paper:papers(*)
-      `)
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
-
-    if (limit) {
-      query = query.limit(limit);
-    }
-
-    const { data, error } = await query;
-
-    if (error) throw error;
-    return { data, error: null };
-  } catch (error) {
-    console.error('Error getting paper interactions:', error);
-    return { data: null, error };
-  }
-}
-
-// Discovered Papers
-export async function getDiscoveredPapers(type: 'recommended' | 'trending'): Promise<DbArrayResult<DiscoveredPaper>> {
-  const supabase = createBrowserClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { data: [], error: null };
-
-  const source = type === 'trending' ? 'trending_search' : 'recommendations';
-
-  const { data, error } = await supabase
-    .from('discovered_papers')
-    .select('*')
-    .eq('user_id', user.id)
-    .eq('source', source)
-    .order('discovered_at', { ascending: false });
-
-  if (error) {
-    console.error('Error getting papers:', error);
-  }
-
-  return { data, error };
-}
-
-export async function storeDiscoveredPapers(
-  papers: Omit<DiscoveredPaper, 'user_id'>[]
-): Promise<DbArrayResult<DiscoveredPaper>> {
-  const supabase = createBrowserClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { data: [], error: null };
-
-  try {
-    const { data, error } = await supabase
-      .from('discovered_papers')
-      .insert(papers.map(paper => ({
-        ...paper,
-        user_id: user.id
-      })))
-      .select();
-
-    if (error) {
-      console.error('Supabase error details:', error);
-      return { data: null, error };
-    }
-
-    if (!data || data.length === 0) {
-      console.error('No data returned from insert');
-      return { data: null, error: new Error('Failed to store papers') };
-    }
-
-    return { data, error: null };
-  } catch (error) {
-    console.error('Error storing papers:', error);
-    return { data: null, error: error instanceof Error ? error : new Error('Unknown error occurred') };
-  }
-} 

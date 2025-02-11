@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileText, Plus, Grid2x2, Search, Clock, BookOpen, Filter, Activity, MessageSquare, ChevronDown, SlidersHorizontal } from "lucide-react";
+import { FileText, Plus, Grid2x2, Search, Clock, BookOpen, Filter, Activity, MessageSquare, ChevronDown, SlidersHorizontal, Trash2, Pencil, LayoutGrid, List, Settings2, Sparkles } from "lucide-react";
 import { AddPaperDialog } from "@/components/library/add-paper-dialog";
 import { getPapers, getCategories, getReadingList, getAnnotationsByPaper, schedulePaper, addToReadingList, deletePaper } from "@/lib/supabase/db";
 import { Badge } from "@/components/ui/badge";
@@ -14,13 +14,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { FilterSortDialog } from "@/components/library/filter-sort-dialog";
-import { PaperCard } from "@/components/paper-card";
+import { PaperCard, PaperCardSkeleton } from "@/components/paper-card";
 import type { Paper } from "@/lib/supabase/types";
 import { useCategories } from "@/lib/context/categories-context";
 import { cn } from "@/lib/utils";
 import { DeletePaperDialog } from "@/components/library/delete-paper-dialog";
 import { toast } from "sonner";
 import { cache, CACHE_KEYS } from "@/lib/cache";
+import supabase from "@/lib/supabase/client";
+import { MainLayout } from "@/components/layout/main-layout";
 
 interface Category {
   id: string;
@@ -68,7 +70,7 @@ async function preloadData(refresh = false) {
   const cachedPapers = !refresh && cache.get<Paper[]>(CACHE_KEYS.PAPERS);
   const cachedCategories = !refresh && cache.get<Category[]>(CACHE_KEYS.CATEGORIES);
   const cachedReadingList = !refresh && cache.get<ReadingListItem[]>(CACHE_KEYS.READING_LIST);
-  const cachedAnnotations = !refresh && cache.get<Annotation[]>(CACHE_KEYS.ANNOTATIONS);
+  const cachedAnnotations = !refresh && cache.get(CACHE_KEYS.ANNOTATIONS as unknown as string) as Annotation[] | null;
 
   if (cachedPapers && cachedCategories && cachedReadingList && cachedAnnotations) {
     return {
@@ -79,29 +81,29 @@ async function preloadData(refresh = false) {
     };
   }
 
-  // First get papers to get their IDs
-  const papersResult = await getPapers();
-  const papers = papersResult.data || [];
-
-  // Then load everything else in parallel including annotations for each paper
-  const [categoriesResult, readingListResult, annotationsResults] = await Promise.all([
+  // Load everything in parallel
+  const [papersResult, categoriesResult, readingListResult, annotationsResult] = await Promise.all([
+    getPapers(),
     getCategories(),
     getReadingList(),
-    Promise.all(papers.map(paper => getAnnotationsByPaper(paper.id)))
+    // Only fetch recent annotations instead of for every paper
+    supabase
+      .from('annotations')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(10)
   ]);
 
+  const papers = papersResult.data || [];
   const categories = categoriesResult.data || [];
   const readingList = readingListResult.data || [];
-  const annotations = annotationsResults
-    .filter(result => !result.error)
-    .flatMap(result => result.data || [])
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  const annotations = annotationsResult.data || [];
 
   if (!refresh) {
     cache.set(CACHE_KEYS.PAPERS, papers);
     cache.set(CACHE_KEYS.CATEGORIES, categories);
     cache.set(CACHE_KEYS.READING_LIST, readingList);
-    cache.set(CACHE_KEYS.ANNOTATIONS, annotations);
+    cache.set(CACHE_KEYS.ANNOTATIONS as unknown as string, annotations);
   }
 
   return { papers, categories, readingList, annotations };
@@ -146,7 +148,7 @@ export default function LibraryPage() {
     const cachedPapers = cache.get<Paper[]>(CACHE_KEYS.PAPERS);
     const cachedCategories = cache.get<Category[]>(CACHE_KEYS.CATEGORIES);
     const cachedReadingList = cache.get<ReadingListItem[]>(CACHE_KEYS.READING_LIST);
-    const cachedAnnotations = cache.get<Annotation[]>(CACHE_KEYS.ANNOTATIONS);
+    const cachedAnnotations = cache.get<Annotation[]>(CACHE_KEYS.ANNOTATIONS as unknown as string);
     
     if (cachedPapers && cachedCategories && cachedReadingList && cachedAnnotations) {
       setPapers(cachedPapers);
@@ -169,7 +171,7 @@ export default function LibraryPage() {
         );
       
       const matchesCategories = selectedCategories.length === 0 ||
-        selectedCategories.includes(paper.category_id || "");
+        selectedCategories.includes(paper.category_id || "uncategorized");
 
       return matchesSearch && matchesCategories;
     })
@@ -180,12 +182,15 @@ export default function LibraryPage() {
     });
 
   // Group papers by category
-  const papersByCategory = categories.reduce((acc, category) => {
-    acc[category.id] = filteredPapers.filter(
-      paper => paper.category_id === category.id
-    );
-    return acc;
-  }, {} as Record<string, Paper[]>);
+  const papersByCategory = {
+    ...categories.reduce((acc, category) => {
+      acc[category.id] = filteredPapers.filter(
+        paper => paper?.category_id === category.id
+      );
+      return acc;
+    }, {} as Record<string, Paper[]>),
+    uncategorized: filteredPapers.filter(paper => !paper?.category_id)
+  };
 
   // Get reading status
   const getReadingStatus = (paperId: string) => {
@@ -197,11 +202,11 @@ export default function LibraryPage() {
   // Split categories into visible and overflow
   const MAX_VISIBLE_CATEGORIES = 3;
   const visibleCategories = categories
-    .filter(category => papers.filter(p => p.category_id === category.id).length > 0)
+    .filter(category => papers.filter(p => p?.category_id === category.id).length > 0)
     .slice(0, MAX_VISIBLE_CATEGORIES);
   
   const overflowCategories = categories
-    .filter(category => papers.filter(p => p.category_id === category.id).length > 0)
+    .filter(category => papers.filter(p => p?.category_id === category.id).length > 0)
     .slice(MAX_VISIBLE_CATEGORIES);
 
   const handlePaperClick = (paper: Paper) => {
@@ -265,13 +270,13 @@ export default function LibraryPage() {
     }
   };
 
-  const handleDeletePaper = async (paper: Paper) => {
+  const handleDeletePaper = (paper: Paper) => {
     setPaperToDelete(paper);
   };
 
   const handleConfirmDelete = async () => {
     if (!paperToDelete) return;
-
+    
     try {
       setIsDeleting(true);
       const result = await deletePaper(paperToDelete.id);
@@ -280,15 +285,20 @@ export default function LibraryPage() {
         throw result.error;
       }
 
-      // Update local state
-      setPapers(prevPapers => prevPapers.filter(p => p.id !== paperToDelete.id));
+      // Just reload the data instead of trying to manage state
+      await loadData(true);
+      
+      // Clean up dialog state
+      setPaperToDelete(null);
+      setIsDeleting(false);
+      
       toast.success("Paper deleted successfully");
     } catch (error) {
       console.error("Error deleting paper:", error);
-      toast.error("Failed to delete paper");
-    } finally {
-      setIsDeleting(false);
+      // Clean up dialog state even on error
       setPaperToDelete(null);
+      setIsDeleting(false);
+      toast.error("Failed to delete paper");
     }
   };
 
@@ -305,6 +315,163 @@ export default function LibraryPage() {
       />
     );
   };
+
+  // Render category section
+  const renderCategorySection = (categoryId: string, papers: Paper[]) => {
+    if (!papers.length) return null;
+    
+    const category = categories.find(c => c.id === categoryId);
+    const isUncategorized = categoryId === 'uncategorized';
+    
+    return (
+      <motion.div 
+        key={categoryId}
+        variants={itemVariants}
+        className="mb-4 last:mb-0"
+      >
+        <div className="flex items-center gap-2 mb-2 px-2">
+          <div className="flex items-center gap-1.5">
+            <div 
+              className="w-1.5 h-1.5 rounded-full"
+              style={{ 
+                backgroundColor: isUncategorized ? '#666666' : category?.color 
+              }}
+            />
+            <h3 className="text-[11px] font-medium text-[#888]">
+              {isUncategorized ? "Uncategorized" : category?.name}
+            </h3>
+          </div>
+          <span className="text-[10px] text-[#666]">
+            {papers.length} papers
+          </span>
+        </div>
+        <div className={cn(
+          viewMode === "list" 
+            ? "space-y-[2px]" 
+            : "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 px-2"
+        )}>
+          {papers.map(paper => (
+            <motion.div
+              key={paper.id}
+              whileHover={{ scale: 1.01 }}
+              whileTap={{ scale: 0.99 }}
+              className={cn(
+                "min-h-[180px]",
+                viewMode === "list" ? "max-w-4xl p-2 mx-auto" : "h-full"
+              )}
+            >
+              <PaperCard
+                paper={{
+                  ...paper,
+                  citations: paper?.citations || 0,
+                  impact: paper?.impact || "low",
+                  url: paper?.url || "",
+                  topics: paper?.topics || [],
+                  category: categories.find(c => c.id === paper?.category_id),
+                  in_reading_list: readingList.some(item => item.paper_id === paper.id),
+                  scheduled_date: paper?.scheduled_date,
+                  estimated_time: paper?.estimated_time,
+                  repeat: paper?.repeat
+                }}
+                onAddToList={async () => {
+                  const result = await addToReadingList(paper.id);
+                  if (!result.error) {
+                    setReadingList(prev => [...prev, result.data!]);
+                  }
+                }}
+                onSchedule={(date, estimatedTime, repeat) => 
+                  handleSchedulePaper(paper.id, date, estimatedTime, repeat)
+                }
+                onDelete={() => handleDeletePaper(paper)}
+                isLoading={isDeleting && paperToDelete?.id === paper.id}
+                context="main"
+                showScheduleButton={!readingList.some(item => item.paper_id === paper.id)}
+                showAddToListButton={!readingList.some(item => item.paper_id === paper.id)}
+                variant={viewMode === "list" ? "default" : "compact"}
+              />
+            </motion.div>
+          ))}
+        </div>
+      </motion.div>
+    );
+  };
+
+  if (isLoading) {
+    return (
+      <div className="p-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[...Array(6)].map((_, i) => (
+            <PaperCardSkeleton key={i} />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (papers.length === 0) {
+    return (
+      <motion.div 
+        className="flex flex-col h-full"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.3 }}
+      >
+        <div className="flex-shrink-0 border-b border-[#1a1f2e] bg-[#030014]">
+          <motion.div 
+            className="p-4"
+            initial={{ y: -20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ duration: 0.3 }}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h1 className="text-sm font-medium text-white">My Library</h1>
+                <p className="text-xs text-[#4a5578]">
+                  Browse and manage your research papers and ideas
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+
+        <div className="flex-1 flex items-center justify-center p-6">
+          <div className="flex flex-col items-center max-w-md text-center">
+            <div className="w-12 h-12 rounded-full bg-[#1a1f2e] flex items-center justify-center mb-6">
+              <BookOpen className="w-6 h-6 text-blue-500" />
+            </div>
+            <h2 className="text-xl font-medium text-white mb-2">Your Library is Empty</h2>
+            <p className="text-sm text-[#4a5578] mb-8">
+              Start building your research collection by adding papers. You can import PDFs directly or add them from external sources.
+            </p>
+            <div className="flex flex-col w-full gap-3">
+              <Button 
+                onClick={() => setIsAddPaperOpen(true)}
+                className="h-9 px-4 text-sm bg-[#1a1f2e] hover:bg-[#2a3142] text-white"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Your First Paper
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => router.push('/discover')}
+                className="h-9 px-4 text-sm border-[#1a1f2e] hover:bg-[#1a1f2e] text-[#4a5578]"
+              >
+                <Sparkles className="h-4 w-4 mr-2" />
+                Discover Research Papers
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Add Paper Dialog */}
+        <AddPaperDialog 
+          open={isAddPaperOpen} 
+          onOpenChange={setIsAddPaperOpen} 
+          onPaperAdded={handlePaperAdded}
+        />
+      </motion.div>
+    );
+  } 
 
   return (
     <motion.div 
@@ -323,7 +490,7 @@ export default function LibraryPage() {
         >
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h1 className="text-lg font-medium text-white">My Library</h1>
+              <h1 className="text-sm font-medium text-white">My Library</h1>
               <p className="text-xs text-[#4a5578]">
                 Browse and manage your research papers and ideas
               </p>
@@ -381,97 +548,116 @@ export default function LibraryPage() {
           animate={{ x: 0, opacity: 1 }}
           transition={{ duration: 0.3, delay: 0.2 }}
         >
-          <div className="w-[260px] p-4 border-r border-[#2a2a2a] bg-[#030014] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] h-full">
-            <h3 className="text-sm font-medium text-white mb-4">Recent Activity</h3>
-            
-            {/* Reading Progress */}
-            <div className="mb-6">
-              <h4 className="text-xs font-medium text-[#888] mb-2">
-                Reading List
-              </h4>
-              <div className="space-y-1">
-                {readingList.slice(0, 3).map(item => {
-                  const paper = papers.find(p => p.id === item.paper_id);
-                  if (!paper) return null;
-                  
-                  return (
-                    <div 
-                      key={item.id} 
-                      className="flex items-center gap-2 hover:bg-[#2a2a2a] p-2 rounded cursor-pointer transition-colors group"
-                      onClick={() => handlePaperClick(paper)}
-                    >
-                      <BookOpen className="h-3.5 w-3.5 text-violet-500 shrink-0" />
-                      <div className="min-w-0 flex-1">
-                        <div className="text-[11px] text-[#888] group-hover:text-white truncate leading-snug">
-                          {paper.title}
+          {papers.length === 0 ? (
+            <div className="w-[260px] p-4 border-r border-[#2a2a2a] bg-[#030014] h-full flex flex-col items-center justify-center text-center">
+              <div className="mb-4">
+                <Clock className="h-8 w-8 text-[#4a5578] mb-2" />
+                <h3 className="text-sm font-medium text-white">No Activity Yet</h3>
+                <p className="text-xs text-[#888] mt-1">
+                  Add some papers to see your recent activity here
+                </p>
+              </div>
+              <Button
+                onClick={() => setIsAddPaperOpen(true)}
+                className="h-8 px-3 text-[11px] bg-[#1a1f2e] hover:bg-[#2a3142] text-white"
+              >
+                <Plus className="h-3.5 w-3.5 mr-2" />
+                Add your first paper
+              </Button>
+            </div>
+          ) : (
+            <div className="w-[260px] p-4 border-r border-[#2a2a2a] bg-[#030014] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] h-full">
+              <h3 className="text-sm font-medium text-white mb-4">Recent Activity</h3>
+              
+              {/* Reading Progress */}
+              <div className="mb-6">
+                <h4 className="text-xs font-medium text-[#888] mb-2">
+                  Reading List
+                </h4>
+                <div className="space-y-1">
+                  {readingList.slice(0, 3).map(item => {
+                    const paper = papers.find(p => p.id === item.paper_id);
+                    if (!paper) return null;
+                    
+                    return (
+                      <div 
+                        key={item.id} 
+                        className="flex items-center gap-2 hover:bg-[#2a2a2a] p-2 rounded cursor-pointer transition-colors group"
+                        onClick={() => handlePaperClick(paper)}
+                      >
+                        <BookOpen className="h-3.5 w-3.5 text-violet-500 shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[11px] text-[#888] group-hover:text-white truncate leading-snug">
+                            {paper.title}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
 
-                        {/* Active Chats */}
-                        <div>
-              <h4 className="text-xs font-medium text-[#888] mb-2">
-                Active Conversations
-              </h4>
-              <div className="space-y-2">
-                {recentAnnotations
-                  .filter(a => a.chat_history && a.chat_history.length > 0)
-                  .slice(0, 3)
-                  .map(annotation => {
+              {/* Active Chats */}
+              <div>
+                <h4 className="text-xs font-medium text-[#888] mb-2">
+                  Active Conversations
+                </h4>
+                <div className="space-y-2">
+                  {recentAnnotations
+                    .filter(a => a.chat_history && a.chat_history.length > 0)
+                    .slice(0, 3)
+                    .map(annotation => {
+                      const paper = papers.find(p => p.id === annotation.paper_id);
+                      if (!paper) return null;
+                      return (
+                        <div 
+                          key={annotation.id} 
+                          className="flex items-center gap-2 hover:bg-[#2a2a2a] p-1.5 rounded cursor-pointer transition-colors group"
+                          onClick={() => handlePaperClick(paper)}
+                        >
+                          <Activity className="h-3.5 w-3.5 text-emerald-500" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[11px] text-[#888] group-hover:text-white truncate">
+                              {paper.title}
+                            </p>
+                            <p className="text-[10px] text-[#666] group-hover:text-[#888]">
+                              {annotation.chat_history?.length} messages
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+
+              {/* Recent Annotations */}
+              <div className="mt-6">
+                <h4 className="text-xs font-medium text-[#888] mb-2">
+                  Recent Annotations
+                </h4>
+                <div className="space-y-2">
+                  {recentAnnotations.map(annotation => {
                     const paper = papers.find(p => p.id === annotation.paper_id);
                     if (!paper) return null;
                     return (
                       <div 
                         key={annotation.id} 
-                        className="flex items-center gap-2 hover:bg-[#2a2a2a] p-1.5 rounded cursor-pointer transition-colors group"
+                        className="space-y-1 hover:bg-[#2a2a2a] p-1.5 rounded cursor-pointer transition-colors group"
                         onClick={() => handlePaperClick(paper)}
                       >
-                        <Activity className="h-3.5 w-3.5 text-emerald-500" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[11px] text-[#888] group-hover:text-white truncate">
-                            {paper.title}
-                          </p>
-                          <p className="text-[10px] text-[#666] group-hover:text-[#888]">
-                            {annotation.chat_history?.length} messages
-                          </p>
-                        </div>
+                        <p className="text-[11px] text-slate-100 group-hover:text-white line-clamp-2">
+                          {annotation.content}
+                        </p>
+                        <p className="text-[10px] text-[#666] group-hover:text-[#888]">
+                          on {paper.title}
+                        </p>
                       </div>
                     );
                   })}
+                </div>
               </div>
             </div>
-
-            {/* Recent Annotations */}
-            <div className="mt-6">
-              <h4 className="text-xs font-medium text-[#888] mb-2">
-                Recent Annotations
-              </h4>
-              <div className="space-y-2">
-                {recentAnnotations.map(annotation => {
-                  const paper = papers.find(p => p.id === annotation.paper_id);
-                  if (!paper) return null;
-                  return (
-                    <div 
-                      key={annotation.id} 
-                      className="space-y-1 hover:bg-[#2a2a2a] p-1.5 rounded cursor-pointer transition-colors group"
-                      onClick={() => handlePaperClick(paper)}
-                    >
-                      <p className="text-[11px] text-slate-100 group-hover:text-white line-clamp-2">
-                        {annotation.content}
-                      </p>
-                      <p className="text-[10px] text-[#666] group-hover:text-[#888]">
-                        on {paper.title}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
+          )}
         </motion.div>
 
         {/* Papers List */}
@@ -498,80 +684,13 @@ export default function LibraryPage() {
                 initial="hidden"
                 animate="visible"
               >
-                {Object.entries(papersByCategory).map(([categoryId, papers]) => {
-                  const category = categories.find(c => c.id === categoryId);
-                  if (!papers.length) return null;
-                  
-                  return (
-                    <motion.div 
-                      key={categoryId}
-                      variants={itemVariants}
-                      className="mb-4 last:mb-0"
-                    >
-                      <div className="flex items-center gap-2 mb-2 px-2">
-                        <div className="flex items-center gap-1.5">
-                          <div 
-                            className="w-1.5 h-1.5 rounded-full"
-                            style={{ backgroundColor: category?.color }}
-                          />
-                          <h3 className="text-[11px] font-medium text-[#888]">
-                            {category?.name || "Uncategorized"}
-                          </h3>
-                        </div>
-                        <span className="text-[10px] text-[#666]">
-                          {papers.length} papers
-                        </span>
-                      </div>
-                      <div className={cn(
-                        viewMode === "list" 
-                          ? "space-y-[2px]" 
-                          : "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 px-2"
-                      )}>
-                        {papers.map(paper => (
-                          <motion.div
-                            key={paper.id}
-                            whileHover={{ scale: 1.01 }}
-                            whileTap={{ scale: 0.99 }}
-                            className={cn(
-                              "min-h-[180px]",
-                              viewMode === "list" ? "max-w-4xl p-2  mx-auto" : "h-full"
-                            )}
-                          >
-                            <PaperCard
-                              paper={{
-                                ...paper,
-                                citations: paper.citations || 0,
-                                impact: paper.impact || "low",
-                                url: paper.url || "",
-                                topics: paper.topics || [],
-                                category: categories.find(c => c.id === paper.category_id),
-                                in_reading_list: readingList.some(item => item.paper_id === paper.id),
-                                scheduled_date: paper.scheduled_date,
-                                estimated_time: paper.estimated_time,
-                                repeat: paper.repeat
-                              }}
-                              onAddToList={async () => {
-                                const result = await addToReadingList(paper.id);
-                                if (!result.error) {
-                                  setReadingList(prev => [...prev, result.data!]);
-                                }
-                              }}
-                              onSchedule={(date, estimatedTime, repeat) => 
-                                handleSchedulePaper(paper.id, date, estimatedTime, repeat)
-                              }
-                              onDelete={() => handleDeletePaper(paper)}
-                              isLoading={isLoading}
-                              context="main"
-                              showScheduleButton={!readingList.some(item => item.paper_id === paper.id)}
-                              showAddToListButton={!readingList.some(item => item.paper_id === paper.id)}
-                              variant={viewMode === "list" ? "default" : "compact"}
-                            />
-                          </motion.div>
-                        ))}
-                      </div>
-                    </motion.div>
-                  );
-                })}
+                {/* Render categorized papers first */}
+                {Object.entries(papersByCategory)
+                  .filter(([categoryId]) => categoryId !== 'uncategorized')
+                  .map(([categoryId, papers]) => renderCategorySection(categoryId, papers))}
+                
+                {/* Render uncategorized papers last */}
+                {renderCategorySection('uncategorized', papersByCategory.uncategorized)}
               </motion.div>
             )}
           </ScrollArea>
@@ -591,9 +710,11 @@ export default function LibraryPage() {
       <DeletePaperDialog
         open={Boolean(paperToDelete)}
         onOpenChange={(open) => !open && setPaperToDelete(null)}
-        onConfirm={handleConfirmDelete}
+        paperId={paperToDelete?.id || ""}
         paperTitle={paperToDelete?.title || ""}
-        isDeleting={isDeleting}
+        onSuccess={() => {
+          setPapers(prevPapers => prevPapers.filter(p => p.id !== paperToDelete?.id));
+        }}
       />
     </motion.div>
   );

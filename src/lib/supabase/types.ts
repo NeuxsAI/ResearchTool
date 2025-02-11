@@ -94,15 +94,14 @@ export interface DbArrayResult<T> {
 export interface DiscoveredPaper {
   id: string;
   title: string;
-  abstract?: string;
   authors: string[];
+  abstract?: string;
+  url: string;
   year: number;
   citations?: number;
   impact?: 'high' | 'low';
-  url?: string;
   topics?: string[];
-  source: string;
+  source: 'recommendations' | 'trending_search';
   user_id: string;
-  created_at: string;
-  metadata?: any;
+  discovered_at: string;
 } 

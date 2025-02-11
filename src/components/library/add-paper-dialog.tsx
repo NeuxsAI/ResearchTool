@@ -22,7 +22,7 @@ import { useRouter } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { extractTextFromPDF } from "@/lib/pdf/extract-text";
 import { parsePaperContent } from "@/lib/ai/paper-parser";
-import { createClient } from "@/lib/supabase/client";
+import supabase from "@/lib/supabase/client";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCategories } from "@/lib/context/categories-context";
 
@@ -124,7 +124,6 @@ export function AddPaperDialog({ open, onOpenChange, categoryId, onPaperAdded }:
       setIsLoading(true);
 
       // Get auth token
-      const supabase = createClient();
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) {
         throw new Error('Not authenticated');
@@ -136,7 +135,7 @@ export function AddPaperDialog({ open, onOpenChange, categoryId, onPaperAdded }:
       // Create form data
       const formData = new FormData();
       if (file) {
-        formData.append('file', file);
+        formData.append('pdf', file);
       }
       if (url) {
         formData.append('url', url);
@@ -167,23 +166,20 @@ export function AddPaperDialog({ open, onOpenChange, categoryId, onPaperAdded }:
       // Submit the form
       const response = await fetch('/api/papers', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`
-        },
-        body: formData
+        body: formData,
+        credentials: 'include'
       });
 
-      const data = await response.json();
-      console.log('Response from server:', data);
-      
       if (!response.ok) {
-        console.error('Failed to create paper:', data);
-        throw new Error(data.error || 'Failed to create paper');
+        const error = await response.json();
+        console.error('Response from server:', error);
+        throw new Error(error.error || 'Failed to create paper');
       }
 
+      const { data } = await response.json();
       toast.success("Paper added successfully");
       if (onPaperAdded) {
-        onPaperAdded(data.paper);
+        onPaperAdded(data);
       }
       resetForm();
       onOpenChange(false);
@@ -201,7 +197,7 @@ export function AddPaperDialog({ open, onOpenChange, categoryId, onPaperAdded }:
       if (!open) resetForm();
       onOpenChange(open);
     }}>
-      <DialogContent className="sm:max-w-[600px] bg-[#030014] border-[#2a2a2a]">
+      <DialogContent className="sm:max-w-[600px] bg-[#1c1c1c] border-[#2a2a2a]">
         {isLoading && <LoadingOverlay message="Processing your paper..." />}
         <form onSubmit={handleSubmit}>
           <DialogHeader>
@@ -329,7 +325,7 @@ export function AddPaperDialog({ open, onOpenChange, categoryId, onPaperAdded }:
                       type="button"
                       onClick={handleUrlSubmit}
                       disabled={!url || isLoading}
-                      className="h-[calc(100%-2px)] px-3 text-[11px] bg-[#1a1f2e] hover:bg-[#2a3142] text-white absolute right-[1px] top-[1px] rounded-l-none"
+                      className="h-[calc(100%-2px)] px-3 text-[11px] bg-[#2a2a2a] hover:bg-[#333] text-white absolute right-[1px] top-[1px] rounded-l-none"
                     >
                       {isLoading ? "Processing..." : "Process"}
                     </Button>
@@ -404,7 +400,7 @@ export function AddPaperDialog({ open, onOpenChange, categoryId, onPaperAdded }:
             <Button 
               type="submit"
               disabled={isLoading || (activeTab === "upload" && !file) || (activeTab === "url" && !url)}
-              className="h-7 px-3 mt-5 text-[11px] bg-[#1a1f2e] hover:bg-[#2a3142] text-white"
+              className="h-7 px-3 mt-5 text-[11px] bg-[#2a2a2a] hover:bg-[#333] text-white"
             >
               Add paper
             </Button>
