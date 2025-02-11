@@ -281,30 +281,6 @@ export default function RecentPage() {
                 <p className="text-xs text-[#4a5578]">View your recent papers and annotations</p>
               </div>
             </div>
-
-            <div className="flex items-center justify-between">
-              <div className="text-[11px] text-[#4a5578]">
-                {papers.length} papers
-              </div>
-              <div className="flex items-center gap-2">
-                <Tabs defaultValue="grid">
-                  <TabsList className="h-7 bg-[#1a1f2e] p-0.5 gap-0.5">
-                    <TabsTrigger 
-                      value="grid" 
-                      className="h-6 w-6 p-0 data-[state=active]:bg-[#2a3142]"
-                    >
-                      <LayoutGrid className="h-3.5 w-3.5" />
-                    </TabsTrigger>
-                    <TabsTrigger 
-                      value="list" 
-                      className="h-6 w-6 p-0 data-[state=active]:bg-[#2a3142]"
-                    >
-                      <List className="h-3.5 w-3.5" />
-                    </TabsTrigger>
-                  </TabsList>
-                </Tabs>
-              </div>
-            </div>
           </div>
         </div>
 
