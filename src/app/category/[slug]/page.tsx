@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Trash2, MessageSquare, Pencil, LayoutGrid, List, Settings2 } from "lucide-react";
+import { Plus, Trash2, MessageSquare, Pencil, LayoutGrid, List, Settings2, FileText } from "lucide-react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { AddPaperDialog } from "@/components/library/add-paper-dialog";
 import { getCategoryById, getPapersByCategory, getReadingList, updatePaper, updateCategory, deletePaper } from "@/lib/supabase/db";
@@ -87,6 +87,8 @@ export default function CategoryPage() {
   const [editedCategory, setEditedCategory] = useState<Category | null>(null);
   const [paperToDelete, setPaperToDelete] = useState<Paper | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const loadData = async (refresh = false) => {
     try {
@@ -176,7 +178,35 @@ export default function CategoryPage() {
   };
 
   const handlePaperAdded = (newPaper: Paper) => {
-    setPapers(prevPapers => [...prevPapers, newPaper]);
+    if (!newPaper?.id) {
+      console.error('Invalid paper data received:', newPaper);
+      toast.error('Failed to add paper: Invalid data received');
+      return;
+    }
+
+    // Ensure the paper has all required properties
+    const paperWithDefaults: Paper = {
+      id: newPaper.id,
+      title: newPaper.title,
+      authors: newPaper.authors || [],
+      year: newPaper.year,
+      abstract: newPaper.abstract || '',
+      url: newPaper.url || '',
+      citations: newPaper.citations || 0,
+      impact: newPaper.impact || 'low',
+      topics: newPaper.topics || [],
+      category: category ? { 
+        id: category.id, 
+        name: category.name, 
+        color: category.color 
+      } : undefined,
+      in_reading_list: true,
+      created_at: newPaper.created_at || new Date().toISOString(),
+      user_id: newPaper.user_id
+    };
+
+    setPapers(prevPapers => [...prevPapers, paperWithDefaults]);
+    toast.success('Paper added successfully');
   };
 
   const handleEditCategory = async (e: React.FormEvent) => {
@@ -230,6 +260,39 @@ export default function CategoryPage() {
       toast.error("Failed to delete paper");
     }
   };
+
+  // Update the paper card rendering to use safe property access
+  const renderPaperCard = (paper: Paper) => (
+    <motion.div key={paper.id} variants={itemVariants}>
+      <PaperCard
+        paper={{
+          id: paper.id,
+          title: paper.title,
+          authors: paper.authors || [],
+          year: paper.year,
+          abstract: paper.abstract || '',
+          url: paper.url || '',
+          citations: paper.citations || 0,
+          impact: paper.impact || 'low',
+          topics: paper.topics || [],
+          category: category ? {
+            id: category.id,
+            name: category.name,
+            color: category.color
+          } : undefined,
+          in_reading_list: true,
+          created_at: paper.created_at,
+          user_id: paper.user_id
+        }}
+        onSchedule={() => {}}
+        onDelete={() => handleDeletePaper(paper)}
+        isLoading={isLoading}
+        context="category"
+        showAddToListButton={false}
+        variant="compact"
+      />
+    </motion.div>
+  );
 
   if (isLoading) {
     return <MainLayout>
@@ -288,79 +351,45 @@ export default function CategoryPage() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <h1 className="text-sm font-medium text-white">{category?.name}</h1>
-              <p className="text-xs text-[#4a5578]">{category?.description || "No description"}</p>
+              <p className="text-xs text-[#4a5578]">
+                {category?.description || `${category?.name}'s papers`}
+              </p>
             </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setEditedCategory(category);
-                  setIsEditCategoryOpen(true);
-                }}
-                className="h-7 px-2.5 text-[11px] hover:bg-[#2a3142] text-[#4a5578]"
-              >
-                <Settings2 className="h-3.5 w-3.5 mr-1.5" />
-                Edit Category
-              </Button>
+            {papers.length > 0 && (
               <Button
                 onClick={() => setIsAddPaperOpen(true)}
-                className="h-7 px-2.5 text-[11px] bg-[#1a1f2e] hover:bg-[#2a3142] text-white"
+                className="h-8 px-3 text-xs bg-[#1a1f2e] hover:bg-[#2a3142]"
+              >
+                <Plus className="h-3.5 w-3.5 mr-1.5" />
+                Add Paper
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 min-h-0 p-6">
+        {papers.length === 0 ? (
+          <div className="h-full flex flex-col items-center justify-center">
+            <div className="flex flex-col items-center max-w-md text-center">
+              <div className="inline-flex items-center px-3 py-1 rounded-full border border-[#2a2a2a] mb-6 text-[11px] text-[#888]">
+                <span className="w-1.5 h-1.5 rounded-full mr-2" style={{ backgroundColor: category.color }} />
+                {category.name}
+              </div>
+              <p className="text-[11px] text-[#666] mb-4">
+                This category is empty. Start by importing an item.
+              </p>
+              <Button
+                onClick={() => setIsAddPaperOpen(true)}
+                className="h-8 px-3 text-[11px] bg-[#1a1f2e] hover:bg-[#2a3142] text-white"
               >
                 <Plus className="h-3.5 w-3.5 mr-1.5" />
                 Add Paper
               </Button>
             </div>
           </div>
-
-          <div className="flex items-center justify-between">
-            <div className="text-[11px] text-[#4a5578]">
-              {papers.length} papers
-            </div>
-            <div className="flex items-center gap-2">
-              <Tabs defaultValue="grid">
-                <TabsList className="h-7 bg-[#1a1f2e] p-0.5 gap-0.5">
-                  <TabsTrigger 
-                    value="grid" 
-                    className="h-6 w-6 p-0 data-[state=active]:bg-[#2a3142]"
-                  >
-                    <LayoutGrid className="h-3.5 w-3.5" />
-                  </TabsTrigger>
-                  <TabsTrigger 
-                    value="list" 
-                    className="h-6 w-6 p-0 data-[state=active]:bg-[#2a3142]"
-                  >
-                    <List className="h-3.5 w-3.5" />
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      {isEmpty ? (
-        <div className="h-[calc(100vh-8.5rem)] flex flex-col items-center justify-center">
-          <div className="flex flex-col items-center max-w-md text-center">
-            <div className="inline-flex items-center px-3 py-1 rounded-full border border-[#2a2a2a] mb-6 text-[11px] text-[#888]">
-              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: category.color }} />
-              <span className="ml-2">{category.name}</span>
-            </div>
-            <p className="text-[11px] text-[#666] mb-4">
-              This category is empty. Start by importing an item.
-            </p>
-            <Button
-              onClick={() => setIsAddPaperOpen(true)}
-              className="h-8 px-3 text-[11px] bg-[#1a1f2e] hover:bg-[#2a3142] text-white"
-            >
-              <Plus className="h-3.5 w-3.5 mr-1.5" />
-              Add Paper
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <div className="p-6">
+        ) : (
           <div className="w-full">
             <Tabs defaultValue="grid" className="w-full">
               <TabsContent value="grid">
@@ -370,27 +399,7 @@ export default function CategoryPage() {
                   initial="hidden"
                   animate="visible"
                 >
-                  {papers.map((paper) => (
-                    <motion.div key={paper.id} variants={itemVariants}>
-                      <PaperCard
-                        paper={{
-                          ...paper,
-                          citations: 0,
-                          impact: "low",
-                          url: "",
-                          topics: [],
-                          category: category,
-                          in_reading_list: true
-                        }}
-                        onSchedule={() => {}}
-                        onDelete={() => handleDeletePaper(paper)}
-                        isLoading={isLoading}
-                        context="category"
-                        showAddToListButton={false}
-                        variant="compact"
-                      />
-                    </motion.div>
-                  ))}
+                  {papers.map((paper) => paper?.id ? renderPaperCard(paper) : null)}
                 </motion.div>
               </TabsContent>
 
@@ -426,8 +435,8 @@ export default function CategoryPage() {
               </TabsContent>
             </Tabs>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 
@@ -479,14 +488,29 @@ export default function CategoryPage() {
       </DialogContent>
     </Dialog>
 
-    <DeletePaperDialog
-      open={Boolean(paperToDelete)}
-      onOpenChange={(open) => !open && setPaperToDelete(null)}
-      paperId={paperToDelete?.id || ""}
-      paperTitle={paperToDelete?.title || ""}
-      onSuccess={() => {
-        setPapers(prevPapers => prevPapers.filter(p => p.id !== paperToDelete?.id));
-      }}
+    <AddPaperDialog
+      open={isAddPaperOpen}
+      onOpenChange={setIsAddPaperOpen}
+      categoryId={params.slug as string}
+      onPaperAdded={handlePaperAdded}
     />
+
+    {selectedPaper && (
+      <EditPaperDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        paper={selectedPaper}
+        onSuccess={handleUpdatePaper}
+      />
+    )}
+
+    {paperToDelete && (
+      <DeletePaperDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        paper={paperToDelete}
+        onSuccess={handleConfirmDelete}
+      />
+    )}
   </MainLayout>;
 } 

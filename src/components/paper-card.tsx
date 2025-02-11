@@ -228,14 +228,7 @@ export function PaperCard({
           
           {variant === 'compact' ? (
             <>
-              <div className="flex items-center justify-between text-[10px] text-[#4a5578]">
-                <span className="line-clamp-1 flex-1">{paper.authors.join(", ")}</span>
-                <span className="flex items-center gap-1.5 whitespace-nowrap">
-                  <span>{paper.year}</span>
-                  <span>•</span>
-                  <span>{paper.citations} citations</span>
-                </span>
-              </div>
+
               {paper.abstract && (
                 <p className="text-[10px] text-[#4a5578] line-clamp-3 leading-relaxed">
                   {paper.abstract}
