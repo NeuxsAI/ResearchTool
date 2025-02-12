@@ -532,7 +532,7 @@ export default function PaperPage() {
 
         {/* Content Area */}
         <motion.div 
-          className={`flex-1 grid ${isAnnotationSidebarOpen ? 'grid-cols-[3fr_1fr]' : 'grid-cols-1'} bg-[#030014]`}
+          className={`flex-1 grid ${isAnnotationSidebarOpen ? 'grid-cols-[2fr_1fr]' : 'grid-cols-1'} bg-[#030014]`}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.3, delay: 0.2 }}
