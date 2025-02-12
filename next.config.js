@@ -1,6 +1,4 @@
 /** @type {import('next').NextConfig} */
-const path = require('path');
-
 const nextConfig = {
   output: 'standalone',
   experimental: {
@@ -15,13 +13,13 @@ const nextConfig = {
       config.externals = [...config.externals, 'canvas'];
     }
 
-    // Handle path aliases
+    // Handle PDF.js worker
     config.resolve.alias = {
       ...config.resolve.alias,
-      '@': path.join(__dirname),
-      '@/components': path.join(__dirname, 'src/components'),
-      '@/lib': path.join(__dirname, 'src/lib'),
-      '@/app': path.join(__dirname, 'src/app'),
+      'pdfjs-dist': 'pdfjs-dist/legacy/build/pdf',
+      '@/components': './src/components',
+      '@/lib': './src/lib',
+      '@/app': './src/app'
     };
 
     return config;
