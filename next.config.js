@@ -6,7 +6,21 @@ const nextConfig = {
       bodySizeLimit: '50mb'
     }
   },
-  serverExternalPackages: ['pdf-parse'],
+  serverExternalPackages: ['pdf-parse', 'canvas'],
+  webpack: (config, { isServer }) => {
+    // Handle canvas module
+    if (isServer) {
+      config.externals = [...config.externals, 'canvas'];
+    }
+
+    // Handle PDF.js worker
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      'pdfjs-dist': 'pdfjs-dist/legacy/build/pdf',
+    };
+
+    return config;
+  },
   async headers() {
     return [
       {
@@ -32,11 +46,9 @@ const nextConfig = {
       }
     ];
   },
-  // Add configuration for handling dynamic routes
   pageExtensions: ['js', 'jsx', 'ts', 'tsx'],
   trailingSlash: false,
   skipMiddlewareUrlNormalize: true,
-  // Disable static optimization warning
   typescript: {
     ignoreBuildErrors: true
   },
@@ -46,15 +58,7 @@ const nextConfig = {
   staticPageGenerationTimeout: 120,
   devIndicators: {
     appIsrStatus: false,
-  },
-  webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      '@': path.join(__dirname, 'src'),
-    };
-    return config;
-  },
+  }
 };
 
-const path = require('path');
 module.exports = nextConfig; 
