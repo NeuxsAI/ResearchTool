@@ -8,7 +8,7 @@ import { CategoriesProvider } from "@/lib/context/categories-context";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'nexusmind - AI-Powered Research Assistant',
+  title: 'Nexus',
   description: 'Organize research papers, extract insights, and connect ideas using AI.',
 };
 

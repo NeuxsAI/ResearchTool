@@ -502,7 +502,7 @@ export default function PaperPage() {
       >
         {/* Top Header with Paper Title and Buttons */}
         <motion.div 
-          className="h-11 flex items-center justify-between px-4 border-b border-[#1a1f2e] bg-[#030014]"
+          className="h-16 flex items-center justify-between px-4 border-b border-[#1a1f2e] mb-1 bg-[#030014]"
           initial={{ y: -20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.3 }}

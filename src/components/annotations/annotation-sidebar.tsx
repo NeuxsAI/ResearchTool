@@ -126,13 +126,13 @@ export function AnnotationSidebar({
           <TabsList className="flex h-[28px] items-center px-2 bg-transparent">
             <TabsTrigger 
               value="annotations"
-              className="flex-1 h-full px-3 text-[10px] uppercase tracking-wider font-medium data-[state=active]:bg-transparent rounded-none border-b-2 border-transparent data-[state=active]:border-violet-500"
+              className="flex-1 h-full w-min px-3 text-[10px] uppercase tracking-wider font-medium data-[state=active]:bg-transparent rounded-none border-b-2 border-transparent data-[state=active]:border-violet-500"
             >
               Annotations
             </TabsTrigger>
             <TabsTrigger 
               value="chat"
-              className="flex-1 h-full px-3 text-[10px] uppercase tracking-wider font-medium data-[state=active]:bg-transparent rounded-none border-b-2 border-transparent data-[state=active]:border-violet-500"
+              className="flex-1 h-full w-min px-3 text-[10px] uppercase tracking-wider font-medium data-[state=active]:bg-transparent rounded-none border-b-2 border-transparent data-[state=active]:border-violet-500"
             >
               Chat
             </TabsTrigger>
