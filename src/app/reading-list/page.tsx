@@ -444,19 +444,88 @@ export default function ReadingListPage() {
   if (isLoading) {
     return (
       <MainLayout>
-        <div className="flex flex-col flex-1">
-          <div className="p-6 border-b border-[#1a1f2e]">
-            <h1 className="text-sm font-medium text-white">Reading List</h1>
-            <p className="text-xs text-[#4a5578]">Schedule and manage your research reading</p>
-          </div>
-          <div className="p-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {[...Array(6)].map((_, i) => (
-                <PaperCardSkeleton key={i} />
+        <motion.div 
+          className="flex flex-col h-full"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3 }}
+        >
+          {/* Header */}
+          <motion.div 
+            className="flex-shrink-0 border-b border-[#1a1f2e] bg-[#030014]"
+            initial={{ y: -20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ duration: 0.3 }}
+          >
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h1 className="text-sm font-medium text-white">Reading List</h1>
+                  <div className="h-4 w-48 bg-[#1a1f2e] rounded animate-pulse" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-24 bg-[#1a1f2e] rounded animate-pulse" />
+                  <div className="h-8 w-8 bg-[#1a1f2e] rounded animate-pulse" />
+                </div>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Content */}
+          <motion.div 
+            className="flex-1 p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3, delay: 0.2 }}
+          >
+            <div className="grid grid-cols-1 gap-4 max-w-4xl mx-auto">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="p-4 bg-[#1a1f2e] rounded-lg animate-pulse">
+                  <div className="flex items-center gap-4">
+                    {/* Left side */}
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="h-10 w-10 rounded bg-[#2a3142]" />
+                        <div className="flex-1">
+                          <div className="h-4 w-3/4 bg-[#2a3142] rounded mb-2" />
+                          <div className="h-3 w-1/2 bg-[#2a3142] rounded" />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="h-4 w-full bg-[#2a3142] rounded" />
+                        <div className="h-4 w-5/6 bg-[#2a3142] rounded" />
+                      </div>
+                    </div>
+                    
+                    {/* Right side */}
+                    <div className="flex flex-col items-end gap-2">
+                      {/* Schedule indicator */}
+                      <div className="flex items-center gap-2">
+                        <div className="h-4 w-24 bg-[#2a3142] rounded" />
+                        <div className="h-8 w-8 rounded-full bg-[#2a3142]" />
+                      </div>
+                      {/* Progress bar */}
+                      <div className="w-32 h-2 bg-[#2a3142] rounded-full mt-2" />
+                      {/* Action buttons */}
+                      <div className="flex items-center gap-2 mt-2">
+                        <div className="h-7 w-7 rounded bg-[#2a3142]" />
+                        <div className="h-7 w-7 rounded bg-[#2a3142]" />
+                        <div className="h-7 w-7 rounded bg-[#2a3142]" />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Topics */}
+                  <div className="flex items-center gap-2 mt-4">
+                    {[...Array(3)].map((_, j) => (
+                      <div key={j} className="h-5 w-16 bg-[#2a3142] rounded-full" />
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       </MainLayout>
     );
   }
@@ -464,7 +533,12 @@ export default function ReadingListPage() {
   if (!isLoading && readingList.length === 0) {
     return (
       <MainLayout>
-        <div className="flex flex-col flex-1">
+        <motion.div 
+          className="flex flex-col flex-1"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3 }}
+        >
           <div className="p-6 border-b border-[#1a1f2e]">
             <h1 className="text-sm font-medium text-white">Reading List</h1>
             <p className="text-xs text-[#4a5578]">Schedule and manage your research reading</p>
@@ -498,16 +572,26 @@ export default function ReadingListPage() {
               </div>
             </div>
           </div>
-        </div>
+        </motion.div>
       </MainLayout>
     );
   }
 
   return (
     <MainLayout>
-      <div className="flex flex-col h-full overflow-hidden bg-[#030014]">
+      <motion.div 
+        className="flex flex-col h-full overflow-hidden bg-[#030014]"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.3 }}
+      >
         {/* Header */}
-        <div className="flex-none border-b border-[#1a1f2e] bg-[#030014]">
+        <motion.div 
+          className="flex-none border-b border-[#1a1f2e] bg-[#030014]"
+          initial={{ y: -20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ duration: 0.3 }}
+        >
           <div className="p-6">
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -515,13 +599,16 @@ export default function ReadingListPage() {
                 <p className="text-xs text-[#4a5578]">Schedule and manage your research reading</p>
               </div>
             </div>
-
-
           </div>
-        </div>
+        </motion.div>
 
         {/* Content Area - Fixed height, no scroll */}
-        <div className="flex-1 flex min-h-0">
+        <motion.div 
+          className="flex-1 flex min-h-0"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3, delay: 0.2 }}
+        >
           {/* Left Panel - Schedule */}
           <div className="w-[260px] border-r border-[#1a1f2e] bg-[#030014] overflow-y-auto">
             <div className="p-3">
@@ -930,8 +1017,8 @@ export default function ReadingListPage() {
               </TabsContent>
             </Tabs>
           </div>
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
 
       {/* Add Delete Dialog */}
       <DeletePaperDialog
