@@ -12,6 +12,27 @@ export type Database = {
           content: string;
           paper_id: string;
           highlight_text?: string;
+          highlight_position?: {
+            boundingRect: {
+              x1: number;
+              y1: number;
+              x2: number;
+              y2: number;
+              width: number;
+              height: number;
+              pageNumber: number;
+            };
+            rects: Array<{
+              x1: number;
+              y1: number;
+              x2: number;
+              y2: number;
+              width: number;
+              height: number;
+              pageNumber: number;
+            }>;
+            pageNumber: number;
+          };
           created_at: string;
           updated_at: string;
           chat_history?: Array<{
@@ -28,6 +49,27 @@ export type Database = {
           content: string;
           paper_id: string;
           highlight_text?: string;
+          highlight_position?: {
+            boundingRect: {
+              x1: number;
+              y1: number;
+              x2: number;
+              y2: number;
+              width: number;
+              height: number;
+              pageNumber: number;
+            };
+            rects: Array<{
+              x1: number;
+              y1: number;
+              x2: number;
+              y2: number;
+              width: number;
+              height: number;
+              pageNumber: number;
+            }>;
+            pageNumber: number;
+          };
           created_at?: string;
           updated_at?: string;
           chat_history?: Array<{

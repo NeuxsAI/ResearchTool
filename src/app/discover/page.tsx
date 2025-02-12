@@ -288,9 +288,19 @@ export default function DiscoverPage() {
 
   return (
     <MainLayout>
-      <div className="flex flex-col h-full bg-[#030014]">
+      <motion.div 
+        className="flex flex-col h-full bg-[#030014]"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.3 }}
+      >
         {/* Header */}
-        <div className="border-b border-[#1a1f2e] bg-[#030014]">
+        <motion.div 
+          className="border-b border-[#1a1f2e] bg-[#030014]"
+          initial={{ y: -20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ duration: 0.3 }}
+        >
           <div className="p-6">
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -301,10 +311,15 @@ export default function DiscoverPage() {
               </div>
             </div>
           </div>
-        </div>
+        </motion.div>
 
         {/* Main Content */}
-        <div className="p-6">
+        <motion.div 
+          className="p-6"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3, delay: 0.2 }}
+        >
           <Tabs 
             defaultValue="search" 
             className="w-full mx-auto relative"
@@ -592,8 +607,8 @@ export default function DiscoverPage() {
               </div>
             </TabsContent>
           </Tabs>
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
     </MainLayout>
   );
 } 

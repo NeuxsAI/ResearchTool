@@ -398,13 +398,82 @@ export default function LibraryPage() {
 
   if (isLoading) {
     return (
-      <div className="p-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[...Array(6)].map((_, i) => (
-            <PaperCardSkeleton key={i} />
-          ))}
+      <motion.div 
+        className="flex flex-col h-full"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.3 }}
+      >
+        <div className="flex-shrink-0 border-b border-[#1a1f2e] bg-[#030014]">
+          <motion.div 
+            className="p-4"
+            initial={{ y: -20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ duration: 0.3 }}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h1 className="text-sm font-medium text-white">My Library</h1>
+                <p className="text-xs text-[#4a5578]">
+                  Browse and manage your research papers and ideas
+                </p>
+              </div>
+              <div className="h-8 w-24 bg-[#1a1f2e] rounded animate-pulse" />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div className="flex-1 relative">
+                <div className="h-8 bg-[#1a1f2e] rounded animate-pulse" />
+              </div>
+              <div className="h-8 w-24 bg-[#1a1f2e] rounded animate-pulse" />
+              <div className="h-8 w-8 bg-[#1a1f2e] rounded animate-pulse" />
+            </div>
+          </motion.div>
         </div>
-      </div>
+
+        <div className="flex-1 min-h-0 flex">
+          {/* Activity Sidebar */}
+          <motion.div 
+            className="w-[260px] flex-shrink-0 p-4 border-r border-[#1a1f2e] bg-[#030014]"
+            initial={{ x: -20, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            transition={{ duration: 0.3, delay: 0.2 }}
+          >
+            <div className="space-y-6">
+              <div>
+                <div className="h-4 w-24 bg-[#1a1f2e] rounded mb-3 animate-pulse" />
+                <div className="space-y-2">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="h-12 bg-[#1a1f2e] rounded animate-pulse" />
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div className="h-4 w-32 bg-[#1a1f2e] rounded mb-3 animate-pulse" />
+                <div className="space-y-2">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="h-12 bg-[#1a1f2e] rounded animate-pulse" />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Papers List */}
+          <motion.div 
+            className="flex-1 min-w-0 p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3, delay: 0.4 }}
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[...Array(6)].map((_, i) => (
+                <PaperCardSkeleton key={i} />
+              ))}
+            </div>
+          </motion.div>
+        </div>
+      </motion.div>
     );
   }
 

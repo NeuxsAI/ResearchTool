@@ -40,6 +40,27 @@ export interface Annotation {
   created_at: string;
   updated_at: string;
   highlight_text?: string;
+  highlight_position?: {
+    boundingRect: {
+      x1: number;
+      y1: number;
+      x2: number;
+      y2: number;
+      width: number;
+      height: number;
+      pageNumber: number;
+    };
+    rects: Array<{
+      x1: number;
+      y1: number;
+      x2: number;
+      y2: number;
+      width: number;
+      height: number;
+      pageNumber: number;
+    }>;
+    pageNumber: number;
+  };
   chat_history?: Array<{
     role: "user" | "assistant" | "system";
     content: string;

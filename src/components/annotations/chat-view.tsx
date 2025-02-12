@@ -208,7 +208,7 @@ export function ChatView({
       {/* Input */}
       <div className="flex-shrink-0 p-3 border-t border-[#2a2a2a] bg-[#030014]">
         {highlightedText && highlightedText.trim() !== "" && (
-          <div className="mb-2 p-2 bg-[#2a2a2a] border-l-2 border-violet-500/30 rounded relative group">
+          <div className="mb-2 p-2 bg-[#2a2a2a] border-l border-violet-500/30 rounded relative group">
             <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
               <Button
                 variant="ghost"
@@ -222,23 +222,24 @@ export function ChatView({
             <p className="text-[10px] text-[#999] leading-relaxed pr-4">{highlightedText}</p>
           </div>
         )}
-        <div className="relative bg-[#2a2a2a] rounded border border-[#333] shadow-sm">
+        <div className="relative bg-[#0d0d0d] rounded-lg border border-[#333] shadow-sm focus-within:border-violet-500/50 transition-colors">
           <Textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
             placeholder="Send a message..."
-            className="min-h-[45px] max-h-[120px] bg-transparent border-none text-[11px] resize-none pr-8 py-2.5 px-3 placeholder:text-[#666]"
+            className="min-h-[45px] max-h-[120px] bg-transparent border-none text-[10px] resize-none pr-8 py-3 px-3.5 placeholder:text-[#666] focus:ring-0 focus:outline-none"
           />
           <Button 
             onClick={handleSend}
             disabled={!input.trim() || isLoading}
-            className="absolute bottom-2 right-2 h-5 px-2 bg-violet-600/75 hover:bg-violet-700 text-[8px] uppercase font-bold text-white"
+            className="absolute bottom-2.5 right-2.5 h-5 px-2 bg-violet-600/75 hover:bg-violet-700 text-[8px] uppercase font-bold text-white rounded-md"
           >
             {isLoading ? (
               <span className="inline-block w-3 h-3 border-[1.5px] border-[#444] text-white border-t-white rounded-full animate-spin" />
             ) : (
               <span className="text-white flex items-center gap-1">
-                Submit
+                Send
                 <Send className="h-2.5 w-2.5" />
               </span>
             )}

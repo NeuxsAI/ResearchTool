@@ -56,7 +56,7 @@ const containerVariants = {
   visible: {
     opacity: 1,
     transition: {
-      staggerChildren: 0.05
+      staggerChildren: 0.1
     }
   }
 };
@@ -67,7 +67,9 @@ const itemVariants = {
     opacity: 1,
     y: 0,
     transition: {
-      duration: 0.3
+      type: "spring",
+      stiffness: 100,
+      damping: 15
     }
   }
 };
@@ -295,50 +297,85 @@ export default function CategoryPage() {
   );
 
   if (isLoading) {
-    return <MainLayout>
-      <motion.div 
-        className="h-full bg-[#030014]"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-      >
-        <div className="p-6 border-b border-[#1a1f2e]">
-          <div className="max-w-3xl">
-            <Skeleton className="h-7 w-48 bg-[#1a1f2e]" />
-            <Skeleton className="h-4 w-96 mt-2 bg-[#1a1f2e]" />
-          </div>
-        </div>
-        <div className="p-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {[...Array(6)].map((_, i) => (
-              <Card key={i} className="p-4 bg-[#1a1f2e] border-[#2a3142]">
-                <div className="flex items-start gap-3">
-                  <Skeleton className="h-10 w-10 rounded bg-[#2a3142]" />
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Skeleton className="h-4 w-24 bg-[#2a3142]" />
-                      <Skeleton className="h-4 w-4 rounded-full bg-[#2a3142]" />
+    return (
+      <MainLayout>
+        <motion.div 
+          className="flex flex-col h-full"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3 }}
+        >
+          {/* Header */}
+          <motion.div 
+            className="flex-shrink-0 border-b border-[#1a1f2e] bg-[#030014]"
+            initial={{ y: -20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ duration: 0.3 }}
+          >
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="h-3 w-3 rounded-full bg-[#1a1f2e] animate-pulse" />
+                    <div className="h-5 w-32 bg-[#1a1f2e] rounded animate-pulse" />
+                  </div>
+                  <div className="h-4 w-48 bg-[#1a1f2e] rounded animate-pulse" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-24 bg-[#1a1f2e] rounded animate-pulse" />
+                  <div className="h-8 w-8 bg-[#1a1f2e] rounded animate-pulse" />
+                </div>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Content */}
+          <motion.div 
+            className="flex-1 p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3, delay: 0.2 }}
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="p-4 bg-[#1a1f2e] rounded-lg animate-pulse">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="h-10 w-10 rounded bg-[#2a3142]" />
+                    <div className="flex-1">
+                      <div className="h-4 w-3/4 bg-[#2a3142] rounded mb-2" />
+                      <div className="h-3 w-1/2 bg-[#2a3142] rounded" />
                     </div>
-                    <Skeleton className="h-4 w-full mb-2 bg-[#2a3142]" />
-                    <Skeleton className="h-4 w-2/3 bg-[#2a3142]" />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="h-4 w-full bg-[#2a3142] rounded" />
+                    <div className="h-4 w-5/6 bg-[#2a3142] rounded" />
+                    <div className="h-4 w-4/6 bg-[#2a3142] rounded" />
                   </div>
                 </div>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </motion.div>
-    </MainLayout>;
+              ))}
+            </div>
+          </motion.div>
+        </motion.div>
+      </MainLayout>
+    );
   }
 
-  if (error || !category) {
-    return <MainLayout>
-      <div className="h-full flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-xl font-semibold text-[#eee] mb-2">Category not found</h1>
-          <p className="text-[#888]">{error || "The category you're looking for doesn't exist."}</p>
-        </div>
-      </div>
-    </MainLayout>;
+  if (error) {
+    return (
+      <MainLayout>
+        <motion.div 
+          className="h-full flex items-center justify-center"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3 }}
+        >
+          <div className="text-center">
+            <h1 className="text-xl font-semibold text-[#eee] mb-2">Error</h1>
+            <p className="text-[#888]">{error}</p>
+          </div>
+        </motion.div>
+      </MainLayout>
+    );
   }
 
   const isEmpty = papers.length === 0;
@@ -374,8 +411,8 @@ export default function CategoryPage() {
           <div className="h-full flex flex-col items-center justify-center">
             <div className="flex flex-col items-center max-w-md text-center">
               <div className="inline-flex items-center px-3 py-1 rounded-full border border-[#2a2a2a] mb-6 text-[11px] text-[#888]">
-                <span className="w-1.5 h-1.5 rounded-full mr-2" style={{ backgroundColor: category.color }} />
-                {category.name}
+                <span className="w-1.5 h-1.5 rounded-full mr-2" style={{ backgroundColor: category?.color }} />
+                {category?.name}
               </div>
               <p className="text-[11px] text-[#666] mb-4">
                 This category is empty. Start by importing an item.
